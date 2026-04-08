@@ -1,0 +1,45 @@
+name: PicFacet
+options:
+  bundleIdPrefix: com.picfacet
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+
+  PicFacetCore:
+    type: framework
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - PicFacetCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.picfacet.core
+        INFOPLIST_FILE: PicFacetCore/Info.plist
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: YES
+
+  PicFacet:
+    type: application
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - PicFacet
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.picfacet.app
+        INFOPLIST_FILE: PicFacet/Info.plist
+        CODE_SIGN_ENTITLEMENTS: PicFacet/PicFacet.entitlements
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+    dependencies:
+      - target: PicFacetCore
+        embed: true
+        codeSign: true
