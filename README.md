@@ -1,133 +1,66 @@
 # PicFacet
 
-A native macOS app that adds a right-click menu in Finder for quickly converting, resizing, and adjusting DPI on image files.
-
-## End Goal
-
-- **Direct download DMG** for early testers (current target)
-- **Mac App Store** release at a fair price — likely **$1.99 – $2.99 one-time purchase**
-- Menu-bar-resident (no Dock icon), minimal UI, everything driven from the Finder right-click menu
+A native macOS app that adds right-click **Quick Actions** in Finder for converting, resizing, and adjusting DPI on image files.
 
 ---
 
-## Features (Planned)
+## 🚨 Cloning? This is required.
 
-### Right-click menu on any image file in Finder
+**The Xcode project is not committed to this repo.** It's regenerated from `project.yml` by [xcodegen](https://github.com/yonaskolb/XcodeGen). After cloning you **must** run:
 
-```
-PicFacet
-├── Convert to →  JPEG · PNG · WebP · TIFF · GIF · BMP · HEIC
-│
-├── Resize →
-│   ├── 25% / 50% / 75%           (configurable presets)
-│   ├── By Percent…               (custom input panel)
-│   ├── Max Width…                (custom input panel)
-│   ├── Max Height…               (custom input panel)
-│   └── ✓ Proportional            (toggle, on by default)
-│
-└── Change DPI →  72 · 96 · 150 · 300 · 600 · 1200 · 2400 · 3600
+```bash
+brew install xcodegen      # one time, if you don't have it
+xcodegen generate          # creates PicFacet.xcodeproj
+open PicFacet.xcodeproj
 ```
 
-### Settings (via menu bar icon)
+If you skip this, there is no `.xcodeproj` to open. Re-run `xcodegen generate` any time you add, remove, or rename a source file.
 
-- Overwrite source file (on/off)
-- Only resize if smaller than target (on/off)
-- Delete original after convert (on/off)
-- Output: same folder as source (default) or custom folder
-- Resize presets (up to 5, editable)
+---
 
-### Batch support
-Select N images → right-click → apply to all. Max 4 concurrent jobs. Progress indicator in menu bar.
+## What it does
+
+Right-click any image (or batch of images) in Finder and pick a PicFacet Quick Action:
+
+- **Convert to** JPEG · PNG · WebP · TIFF · GIF · BMP · HEIC (both directions)
+- **Resize** by percent presets (10/25/50/75/90%)
+- **Change DPI** to 72 / 96 / 150 / 300 / 600 / 1200 / 2400 / 3600
+
+Or pick **PicFacet…** to get the full Liquid Glass picker window with every option in one place.
+
+A menu bar icon hosts settings and a "How to enable Quick Actions…" helper.
 
 ---
 
 ## Architecture
 
 ```
-PicFacet.xcodeproj (generated from project.yml via xcodegen)
+PicFacet.xcodeproj           (generated — gitignored)
 │
-├── PicFacet              (main app, menu bar resident, non-sandboxed dev / sandboxed for MAS)
+├── PicFacet                 (main app, menu-bar resident, LSUIElement)
 │   ├── PicFacetApp.swift
-│   ├── AppDelegate.swift          — dispatches operations to ImageProcessor
-│   ├── MenuBarController.swift    — NSStatusItem + settings window
-│   ├── RequestWatcher.swift       — watches App Group container for requests
-│   └── SettingsView.swift         — SwiftUI settings (Phase 6)
+│   ├── AppDelegate.swift          — registers NSApp.servicesProvider
+│   ├── ServiceProvider.swift      — @objc handlers for every Quick Action
+│   ├── ChooserWindow.swift        — Liquid Glass picker for "PicFacet…"
+│   ├── OnboardingWindow.swift     — first-launch help window
+│   ├── MenuBarController.swift    — NSStatusItem + settings
+│   └── SettingsView.swift
 │
-├── PicFacetExtension     (Finder Sync Extension, sandboxed — required by macOS)
-│   └── FinderSync.swift           — builds context menu, posts requests
-│
-└── PicFacetCore          (shared framework)
-    ├── ImageFormat.swift          — format enum + file extension helpers
+└── PicFacetCore             (shared framework)
+    ├── ImageFormat.swift          — format enum + extension helpers
     ├── ImageProcessor.swift       — orchestrator (OperationQueue, max 4 concurrent)
     ├── ConversionEngine.swift     — ImageIO read/write
     ├── ResizeEngine.swift         — CGContext high-quality resize
     ├── DPIEngine.swift            — per-format DPI metadata patching
     ├── FileOutputManager.swift    — output paths, dedup, overwrite rules
-    ├── PicFacetSettings.swift     — shared UserDefaults model
-    ├── SharedContainer.swift      — App Group container layout
-    ├── OperationBridge.swift      — request serialisation + security-scoped bookmarks
-    ├── ProcessingResult.swift     — result type
-    └── PicFacetError.swift        — error types
+    ├── PicFacetSettings.swift     — UserDefaults model
+    ├── ProcessingResult.swift
+    └── PicFacetError.swift
 ```
 
-### IPC Flow (Extension → Main App)
+### Why NSServices instead of a Finder Sync Extension?
 
-macOS forces Finder Sync Extensions to be sandboxed. They cannot write files to arbitrary locations. The bridge:
-
-```
-1. User clicks a menu item in Finder
-   ↓
-2. Extension creates security-scoped bookmarks for selected URLs
-   ↓
-3. Extension writes {uuid}.json request file into App Group shared container
-   (~/Library/Group Containers/group.com.picfacet.shared/requests/)
-   ↓
-4. Main app's RequestWatcher (DispatchSourceFileSystemObject) notices the file
-   ↓
-5. Main app resolves bookmarks, processes files via ImageProcessor
-   ↓
-6. Main app deletes the request file
-```
-
-This is the only pattern that works both on direct-distribution builds AND the App Store sandbox — no refactor required for App Store submission.
-
----
-
-## Status
-
-### Completed
-
-- ✅ **Phase 1** — Xcode project scaffold (three targets, entitlements, xcodegen config)
-- ✅ **Phase 2** — Full image engine in `PicFacetCore` (convert, resize, DPI — all ImageIO-backed, supports HEIC both directions)
-- ✅ **Phase 3** — Finder Sync Extension with Convert / Resize / Change DPI submenus
-- ✅ **Architecture refactor** — shared-container bookmark-based IPC (see `refactor.md`)
-- ✅ Builds clean, signs with Personal Team, extension appears in Finder right-click menu
-
-### 🔴 Current Blocker
-
-**Menu clicks in the extension do not reach the handler code.** We can see the extension initialise and build the menu (confirmed via `log stream`), and we can see the App Group container open successfully (free Personal Team does allow this on macOS, contrary to common assumption). However, after clicking **Convert to → JPEG**, none of our `NSLog` lines fire and no request file is written to the shared container.
-
-Active diagnostic: an unconditional `/tmp/picfacet-click.txt` write was added to the top of `handleConvert`. If the file doesn't appear after a click, the `@objc` action target is being lost (likely due to how Finder caches the extension, or a target ownership issue) — that's the next thing to investigate.
-
-### Things already tried and ruled out
-
-| Approach | Result |
-|---|---|
-| `NSWorkspace.open("picfacet://…")` from extension | Silently denied by sandbox |
-| `DistributedNotificationCenter` with userInfo | Sandbox strips userInfo from sender |
-| Removing the sandbox from the extension | macOS refuses to load unsandboxed Finder Sync extensions (menu disappears) |
-| `application(_:open:)` URL handler in main app | Never fires because step 1 is blocked |
-| Shared App Group container + bookmarks | Container works, but menu click still not firing — current blocker |
-
-### Next Steps (in order)
-
-1. **Unblock click handler** — the `/tmp/picfacet-click.txt` test will tell us if `handleConvert` is even running. If not: check whether `target = self` is being GC'd, try storing menu item references as properties, or re-register the extension with `pluginkit` after each build.
-2. **Phase 4** — Custom input panels for By Percent / Max Width / Max Height (SwiftUI sheets in the main app, triggered by a special request type from the extension)
-3. **Phase 5** — Menu bar progress indicator (spinner while jobs run, configurable position in settings)
-4. **Phase 6** — Full settings window
-5. **Phase 7** — App icon, DMG packaging, notarization for direct distribution
-6. **Phase 8** — Pricing research (compare to similar utilities — ImageOptim is free, File Juicer is $18, Permute is $15, cleaner one-purpose tools tend to sit at $1.99–$4.99)
-7. **Phase 9** — App Store submission (architecture already compatible, just needs paid Developer Program, proper bundle IDs, and screenshots)
+The first cut of this project used a Finder Sync Extension (the heavy `FIFinderSync` API used by Dropbox/iCloud). Every menu click died in the sandbox. NSServices runs in the main app's process, hands us file URLs directly via the pasteboard, needs no IPC, no App Groups, no bookmarks, and is App Store compatible. It's the right tool for "right-click → do a thing." See `refactor.md` for the full story.
 
 ---
 
@@ -135,47 +68,44 @@ Active diagnostic: an unconditional `/tmp/picfacet-click.txt` write was added to
 
 ### Prerequisites
 
-- **macOS 11+**
-- **Xcode 15+**
+- **macOS 26 (Tahoe)** — required for Liquid Glass
+- **Xcode 26+**
 - **Homebrew**
 - **xcodegen** (`brew install xcodegen`)
 
-### First build
+### Build & run
 
 ```bash
-# 1. Generate the Xcode project
 xcodegen generate
-
-# 2. Open in Xcode
 open PicFacet.xcodeproj
 ```
 
-In Xcode:
+In Xcode: select the **PicFacet** target → **Signing & Capabilities** → set your Team (free Personal Team is fine for local testing). Then **⌘R**.
 
-1. Select the **PicFacet** target → **Signing & Capabilities** → set your Team
-2. Confirm **App Groups** capability is present with `group.com.picfacet.shared` listed
-3. Repeat for the **PicFacetExtension** target (same team, same App Group)
-4. **⌘B** to build, **⌘R** to run
+### First launch
 
-### Enable the extension
+The onboarding window appears automatically and walks you through enabling the Quick Actions you want. By design, **all PicFacet services ship turned off** so they don't clutter your right-click menu — you opt in to the ones you want via:
 
-After first run:
-**System Settings → General → Login Items & Extensions → Extensions (at bottom) → Added Extensions** → enable **PicFacetExtension**.
+**System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders / Pictures**
+
+Tick the PicFacet entries you want. The **PicFacet…** entry is the most useful one — it opens the full picker for any image.
+
+You can re-open the onboarding window any time from the menu bar icon → **How to enable Quick Actions…**
 
 ### Tail the logs
 
 ```bash
-log stream --predicate 'process == "PicFacetExtension" OR process == "PicFacet"' --level debug | grep PicFacet
+log stream --predicate 'process == "PicFacet"' --level debug | grep PicFacet
 ```
+
+You should see `[PicFacet] Service fired — N image(s)` after each click.
 
 ---
 
 ## Apple Developer Account
 
-- **Free Personal Team** ($0) — works for local testing. App Groups DO work on macOS (contrary to common belief — tested and confirmed).
-- **Paid Developer Program** ($99/year) — required for Developer ID notarization, Mac App Store submission, and distribution to other machines.
-
-**For MVP on your own Mac:** free tier is sufficient. Upgrade to paid when ready to ship.
+- **Free Personal Team** ($0) — fine for local builds and testing on your own Mac
+- **Paid Developer Program** ($99/year) — required for notarization, Developer ID distribution, and Mac App Store submission
 
 ---
 
@@ -184,12 +114,26 @@ log stream --predicate 'process == "PicFacetExtension" OR process == "PicFacet"'
 ```
 .
 ├── README.md              ← this file
-├── refactor.md            ← detailed record of the IPC refactor
-├── project.yml            ← xcodegen config (source of truth for targets)
-├── PicFacet.xcodeproj     ← generated — do not edit by hand
-├── PicFacet/              ← main app sources + entitlements + Info.plist
-├── PicFacetExtension/     ← Finder Sync Extension sources + entitlements + Info.plist
-└── PicFacetCore/          ← shared framework sources + Info.plist
+├── refactor.md            ← history of the Finder-Sync → NSServices pivot
+├── project.yml            ← xcodegen config (source of truth)
+├── .gitignore
+├── PicFacet/              ← main app sources, Info.plist, entitlements
+└── PicFacetCore/          ← framework sources + Info.plist
 ```
 
-Anytime you add or remove a source file, re-run `xcodegen generate`.
+`PicFacet.xcodeproj/` and `build/` are gitignored. **Always re-run `xcodegen generate` after adding or removing source files.**
+
+---
+
+## Roadmap
+
+- [x] Phase 1 — Project scaffold (xcodegen)
+- [x] Phase 2 — Image engine (convert/resize/DPI, all formats incl. HEIC)
+- [x] Phase 3 — NSServices Quick Actions (14 ops + chooser)
+- [x] Phase 3.5 — Liquid Glass chooser window + onboarding
+- [ ] Phase 4 — Custom input panels (By Percent / Max Width / Max Height with proportional toggle)
+- [ ] Phase 5 — Menu bar progress indicator
+- [ ] Phase 6 — Full settings window
+- [ ] Phase 7 — App icon, DMG, notarization
+- [ ] Phase 8 — Pricing research ($1.99–$2.99 target)
+- [ ] Phase 9 — Mac App Store submission
