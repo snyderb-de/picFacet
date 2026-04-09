@@ -26,6 +26,7 @@ final class OnboardingWindowController {
             win.titlebarAppearsTransparent = true
             win.title = "Welcome to PicFacet"
             win.isReleasedWhenClosed = false
+            win.backgroundColor = NSColor(PFDesign.canvas)
             win.center()
             window = win
         }
@@ -38,24 +39,20 @@ struct OnboardingView: View {
     let onClose: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 12) {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 32))
-                VStack(alignment: .leading) {
-                    Text("Welcome to PicFacet").font(.title2.weight(.semibold))
-                    Text("Right-click image actions, the easy way.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+        VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Welcome to PicFacet")
+                    .font(.system(size: 28, weight: .semibold))
+                    .tracking(-0.5)
+                    .foregroundStyle(PFDesign.onSurface)
+                Text("Right-click image actions, the easy way.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(PFDesign.onSurfaceVariant)
             }
 
-            Divider()
-
-            Text("Enable Quick Actions")
-                .font(.headline)
-
-            Text("""
+            PFCard {
+                PFSectionLabel(text: "Enable Quick Actions")
+                Text("""
 PicFacet ships every action turned **off** so your right-click menu stays clean. Pick the ones you want:
 
 1. Open **System Settings → Keyboard → Keyboard Shortcuts → Services**.
@@ -65,26 +62,27 @@ PicFacet ships every action turned **off** so your right-click menu stays clean.
 
 Tip: enable **PicFacet…** to get the full picker (every format, every preset) in one click.
 """)
-                .fixedSize(horizontal: false, vertical: true)
+                    .font(.system(size: 12))
+                    .foregroundStyle(PFDesign.onSurface)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(3)
+            }
 
-            HStack {
+            HStack(spacing: 12) {
                 Button("Open System Settings") {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.keyboard?Services") {
                         NSWorkspace.shared.open(url)
                     }
                 }
-                .buttonStyle(.glass)
-
-                Spacer()
+                .buttonStyle(PFSecondaryButtonStyle())
 
                 Button("Got it", action: onClose)
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(PFPrimaryButtonStyle())
                     .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(28)
-        .frame(width: 520)
-        .background(.regularMaterial)
-        .glassEffect(in: .rect(cornerRadius: 18))
+        .padding(32)
+        .frame(width: 560)
+        .background(PFDesign.canvas)
     }
 }

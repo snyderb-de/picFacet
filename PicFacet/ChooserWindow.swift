@@ -2,20 +2,22 @@ import AppKit
 import SwiftUI
 import PicFacetCore
 
-/// Floating Liquid-Glass picker shown when the user invokes the
-/// "PicFacet…" Quick Action. Lists every operation grouped by category
-/// and runs the chosen one against the URLs Finder handed us.
+/// Floating picker shown when the user invokes the "PicFacet…" Quick Action.
+/// Styled after the right-hand control card of the Converter Workspace mockup
+/// (see mockups/picfacet_converter_light). Lists every operation we currently
+/// ship and runs the chosen one against the URLs Finder handed us.
 final class ChooserWindowController {
     static let shared = ChooserWindowController()
 
     private var window: NSWindow?
 
     func show(urls: [URL]) {
+        let root = ChooserView(fileCount: urls.count) { [weak self] op in
+            self?.run(op: op, urls: urls)
+            self?.close()
+        }
         if window == nil {
-            let hosting = NSHostingController(rootView: ChooserView(onPick: { [weak self] op in
-                self?.run(op: op, urls: urls)
-                self?.close()
-            }, fileCount: urls.count))
+            let hosting = NSHostingController(rootView: root)
             let win = NSWindow(contentViewController: hosting)
             win.styleMask = [.titled, .closable, .fullSizeContentView]
             win.titlebarAppearsTransparent = true
@@ -23,23 +25,17 @@ final class ChooserWindowController {
             win.title = "PicFacet"
             win.isReleasedWhenClosed = false
             win.level = .floating
+            win.backgroundColor = NSColor(PFDesign.canvas)
             win.center()
             window = win
         } else {
-            // Rebuild root view so the new URLs are captured.
-            let hosting = NSHostingController(rootView: ChooserView(onPick: { [weak self] op in
-                self?.run(op: op, urls: urls)
-                self?.close()
-            }, fileCount: urls.count))
-            window?.contentViewController = hosting
+            window?.contentViewController = NSHostingController(rootView: root)
         }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
 
-    private func close() {
-        window?.orderOut(nil)
-    }
+    private func close() { window?.orderOut(nil) }
 
     private func run(op: ChooserOp, urls: [URL]) {
         let progress: (Int, Int) -> Void = { d, t in NSLog("[PicFacet] %d/%d", d, t) }
@@ -68,82 +64,111 @@ enum ChooserOp: Hashable {
 // MARK: - View
 
 struct ChooserView: View {
-    let onPick: (ChooserOp) -> Void
     let fileCount: Int
+    let onPick: (ChooserOp) -> Void
+
+    @State private var selectedFormat: ImageFormat? = nil
+    @State private var selectedPercent: Int? = nil
+    @State private var dpi: Int = 300
+
+    private let percents = [10, 25, 50, 75, 90]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
 
-            section("Convert to") {
-                ForEach(ImageFormat.allCases, id: \.self) { fmt in
-                    chip(fmt.displayName) { onPick(.convert(fmt)) }
-                }
-            }
-
-            section("Resize") {
-                ForEach([10, 25, 50, 75, 90], id: \.self) { p in
-                    chip("\(p)%") { onPick(.resizePercent(p)) }
-                }
-            }
-
-            section("Change DPI") {
-                ForEach(PicFacetSettings.dpiOptions, id: \.self) { d in
-                    chip("\(d)") { onPick(.dpi(d)) }
-                }
+            PFCard {
+                formatSection
+                resizeSection
+                dpiSection
+                startButton
             }
         }
         .padding(24)
         .frame(width: 460)
-        .background(.clear)
-        .glassBackground()
+        .background(PFDesign.canvas)
     }
+
+    // MARK: Header
 
     private var header: some View {
-        HStack {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.title2)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("PicFacet").font(.headline)
-                Text("\(fileCount) image\(fileCount == 1 ? "" : "s") selected")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Converter")
+                .font(.system(size: 22, weight: .semibold))
+                .tracking(-0.4)
+                .foregroundStyle(PFDesign.onSurface)
+            Text("\(fileCount) image\(fileCount == 1 ? "" : "s") selected")
+                .font(.system(size: 12))
+                .foregroundStyle(PFDesign.onSurfaceVariant)
+        }
+    }
+
+    // MARK: Sections
+
+    private var formatSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            PFSectionLabel(text: "Format Selection")
+            FlowLayout(spacing: 8) {
+                ForEach(ImageFormat.allCases, id: \.self) { fmt in
+                    PFChip(
+                        title: fmt.displayName,
+                        isSelected: selectedFormat == fmt
+                    ) {
+                        selectedFormat = fmt
+                        selectedPercent = nil
+                    }
+                }
             }
+        }
+    }
+
+    private var resizeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            PFSectionLabel(text: "Resize Controls")
+            FlowLayout(spacing: 8) {
+                ForEach(percents, id: \.self) { p in
+                    PFChip(
+                        title: "\(p)%",
+                        isSelected: selectedPercent == p
+                    ) {
+                        selectedPercent = p
+                        selectedFormat = nil
+                    }
+                }
+            }
+        }
+    }
+
+    private var dpiSection: some View {
+        HStack {
+            PFSectionLabel(text: "DPI Settings")
             Spacer()
+            Picker("", selection: $dpi) {
+                ForEach(PicFacetSettings.dpiOptions, id: \.self) { d in
+                    Text("\(d) DPI").tag(d)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .tint(PFDesign.primary)
+            .fixedSize()
         }
     }
 
-    @ViewBuilder
-    private func section<C: View>(_ title: String, @ViewBuilder content: () -> C) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-            FlowLayout(spacing: 8) { content() }
+    private var startButton: some View {
+        Button {
+            if let f = selectedFormat {
+                onPick(.convert(f))
+            } else if let p = selectedPercent {
+                onPick(.resizePercent(p))
+            } else {
+                onPick(.dpi(dpi))
+            }
+        } label: {
+            Text("Start Processing")
         }
-    }
-
-    private func chip(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.callout)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-        }
-        .buttonStyle(.glass)
-    }
-}
-
-// MARK: - Glass background helper (graceful fallback)
-
-private extension View {
-    @ViewBuilder
-    func glassBackground() -> some View {
-        if #available(macOS 26.0, *) {
-            self.background(.regularMaterial).glassEffect(in: .rect(cornerRadius: 18))
-        } else {
-            self.background(.regularMaterial)
-        }
+        .buttonStyle(PFPrimaryButtonStyle())
+        .padding(.top, 4)
     }
 }
 

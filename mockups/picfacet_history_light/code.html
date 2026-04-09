@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface": "#1a1c1d",
+                    "outline-variant": "#c1c6d7",
+                    "surface-tint": "#005bc1",
+                    "primary-fixed-dim": "#adc6ff",
+                    "tertiary": "#9e3d00",
+                    "on-primary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "surface-container-high": "#e8e8ea",
+                    "surface-container": "#edeef0",
+                    "inverse-surface": "#2f3132",
+                    "secondary-fixed-dim": "#adc6ff",
+                    "on-background": "#1a1c1d",
+                    "on-primary-container": "#fefcff",
+                    "on-primary-fixed-variant": "#004493",
+                    "background": "#f9f9fb",
+                    "outline": "#717786",
+                    "on-error": "#ffffff",
+                    "secondary-fixed": "#d8e2ff",
+                    "error-container": "#ffdad6",
+                    "tertiary-fixed-dim": "#ffb595",
+                    "surface-bright": "#f9f9fb",
+                    "error": "#ba1a1a",
+                    "on-tertiary-fixed": "#351000",
+                    "on-surface-variant": "#414755",
+                    "on-primary-fixed": "#001a41",
+                    "primary": "#0058bc",
+                    "on-secondary-container": "#2d4c83",
+                    "primary-fixed": "#d8e2ff",
+                    "inverse-primary": "#adc6ff",
+                    "surface-container-highest": "#e2e2e4",
+                    "surface": "#f9f9fb",
+                    "on-tertiary-container": "#fffbff",
+                    "on-tertiary": "#ffffff",
+                    "secondary-container": "#a1befd",
+                    "secondary": "#405e96",
+                    "tertiary-container": "#c64f00",
+                    "on-secondary-fixed": "#001a41",
+                    "on-secondary-fixed-variant": "#26467d",
+                    "tertiary-fixed": "#ffdbcc",
+                    "surface-container-low": "#f3f3f5",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-container": "#0070eb",
+                    "surface-dim": "#d9dadc",
+                    "on-tertiary-fixed-variant": "#7c2e00",
+                    "surface-variant": "#e2e2e4",
+                    "inverse-on-surface": "#f0f0f2",
+                    "on-error-container": "#93000a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        .glass-effect {
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased">
+<!-- SideNavBar Anchor -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-2xl flex flex-col p-4 gap-2 font-['Inter'] text-sm antialiased z-40">
+<div class="mb-8 px-4 py-6">
+<h1 class="text-lg font-black tracking-tighter text-slate-900 dark:text-slate-50">PicFacet</h1>
+<p class="text-xs text-slate-500 font-medium">Pro Workspace</p>
+</div>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-xl transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="sync_alt">sync_alt</span>
+<span>Converter</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-xl transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="layers">layers</span>
+<span>Bulk Actions</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-500/20 transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="history" style="font-variation-settings: 'FILL' 1;">history</span>
+<span class="font-semibold">History</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-xl transition-all duration-300 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+<div class="mt-auto p-4 bg-surface-container-low rounded-2xl">
+<div class="flex items-center gap-3 mb-3">
+<img alt="User profile" class="w-8 h-8 rounded-full bg-surface-container-high" data-alt="close-up portrait of a professional designer in a bright modern studio setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB02YF_DfMbbbkMmdVpeqFEn3Lz11R3LbMmP3I6dXZkpUGhK3N5IKtpJIwPHSwnm41-6i7raoPNPT9FobidhLA_GUG4QKVESLDSQSHDGc8P1KvDsS1rJfC_RdqEPlOoenWA7Z8Y6hBXdmXaF83ZSRQt-PxqoiHry4wLx70TooolrkTkTmSQFUQ4usP69rVbslsLJ2o-P2hx7KNOcsVASNpH3qmRvmVogpyVoixFE1LdbdFFxxRilxG8iDWOO18mUew-SN3GmC5PGk8"/>
+<div class="overflow-hidden">
+<p class="text-xs font-bold truncate">Alex Rivera</p>
+<p class="text-[10px] text-slate-500 uppercase tracking-wider">Free Plan</p>
+</div>
+</div>
+<button class="w-full py-2 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-full text-xs font-bold hover:opacity-90 active:scale-95 transition-all">
+                Upgrade Plan
+            </button>
+</div>
+</aside>
+<!-- TopNavBar Anchor -->
+<header class="fixed top-0 right-0 left-64 h-16 px-8 flex justify-between items-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl z-30">
+<div class="flex items-center gap-4">
+<span class="text-sm font-medium text-slate-400">History</span>
+<span class="text-slate-200">/</span>
+<span class="text-sm font-semibold text-slate-900">Task Logs</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer active:scale-95">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer active:scale-95">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-20 p-8 min-h-screen">
+<div class="max-w-6xl mx-auto space-y-8">
+<!-- Page Header & Stats Bento -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="md:col-span-2 space-y-2">
+<h2 class="text-4xl font-bold tracking-tight text-on-surface">Activity History</h2>
+<p class="text-on-surface-variant max-w-lg">Track and manage your past conversions, bulk operations, and file exports with precision control.</p>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl flex items-center justify-between border border-outline-variant/15">
+<div>
+<p class="text-xs font-semibold text-primary uppercase tracking-widest mb-1">Storage Used</p>
+<p class="text-2xl font-bold">12.4 GB <span class="text-sm font-normal text-on-surface-variant">/ 50 GB</span></p>
+</div>
+<div class="w-12 h-12 rounded-full bg-primary/5 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="cloud_done">cloud_done</span>
+</div>
+</div>
+</div>
+<!-- Filters Bar -->
+<div class="flex flex-col md:flex-row gap-4 items-center justify-between bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/15">
+<div class="relative w-full md:w-96">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm" data-icon="search">search</span>
+<input class="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border-transparent focus:border-primary focus:ring-4 focus:ring-primary/10 rounded-xl text-sm transition-all" placeholder="Search tasks, filenames, or labels..." type="text"/>
+</div>
+<div class="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+<button class="flex items-center gap-2 px-4 py-2 bg-surface-container-high text-on-surface rounded-full text-sm font-medium hover:bg-surface-container-highest transition-colors whitespace-nowrap">
+<span class="material-symbols-outlined text-sm" data-icon="filter_list">filter_list</span>
+                        Filter
+                    </button>
+<div class="h-6 w-[1px] bg-outline-variant/30 mx-1"></div>
+<button class="px-4 py-2 bg-primary text-on-primary rounded-full text-sm font-medium whitespace-nowrap">All Tasks</button>
+<button class="px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-full text-sm font-medium whitespace-nowrap transition-colors">Conversions</button>
+<button class="px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-full text-sm font-medium whitespace-nowrap transition-colors">Bulk Actions</button>
+</div>
+</div>
+<!-- Tasks Table Container -->
+<div class="bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant/15 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/50">
+<th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest">Task Details</th>
+<th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest">Type</th>
+<th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest">Date &amp; Time</th>
+<th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest">Status</th>
+<th class="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-widest">Size</th>
+<th class="px-6 py-4"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="professional architectural photograph of a minimalist concrete building at dawn with dramatic shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlwn8R1tCl1fw5GiUvhtdQhZTs8N24s4cGCG5mT7yyL7XYw3IpDq4AQ1RJLBnM_ushH2yrQU0HjgSaXDTh93ZF1KWQfcbo7IdPAk5V1qKbH2_Vo8gnllkrX-y-X7Rdl-yZu6bdOiqd69rEne_-SYpSgLEYWcAXcPDxaAU2aa-EOqRQxIdEXeZmapi_1Jbs_geRg3YjP4vp32Rtf9fozUizbsh2GRXZZVvMiMGjwbXHphDSCpq7U5LP7uRJVwbjtYSf7AUog2JUP_8"/>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface">interior_shot_042.raw</p>
+<p class="text-[11px] text-on-surface-variant font-medium">To WebP • High Quality</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-xs font-medium px-3 py-1 bg-surface-container-high rounded-full text-on-secondary-fixed-variant">Conversion</span>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm text-on-surface-variant">Oct 24, 2023</p>
+<p class="text-[11px] text-outline">14:22 PM</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-1.5 text-emerald-600">
+<span class="material-symbols-outlined text-sm" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-xs font-bold">Success</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-on-surface font-medium">24.8 MB</span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="p-2 opacity-0 group-hover:opacity-100 hover:bg-surface-container-high rounded-full transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="download">download</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center">
+<span class="material-symbols-outlined text-orange-600" data-icon="folder_zip">folder_zip</span>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface">Summer_Portfolio_2023</p>
+<p class="text-[11px] text-on-surface-variant font-medium">Bulk Compress • 12 Files</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-xs font-medium px-3 py-1 bg-surface-container-high rounded-full text-on-secondary-fixed-variant">Bulk Action</span>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm text-on-surface-variant">Oct 24, 2023</p>
+<p class="text-[11px] text-outline">12:05 PM</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-1.5 text-emerald-600">
+<span class="material-symbols-outlined text-sm" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-xs font-bold">Success</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-on-surface font-medium">186.2 MB</span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="p-2 opacity-0 group-hover:opacity-100 hover:bg-surface-container-high rounded-full transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="download">download</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low/30 transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
+<img class="w-full h-full object-cover" data-alt="close-up of vibrant tropical plants with morning dew drops on wide green leaves" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMQPK2eug-aMyxYd--7ZJFlhI-0SgCFXVSexLmAWAxCfvOizw7jvXIW0VYGJP8JgTiexRMFo_VT3ol4lR3OIqav0GJwos3sDH8DEcwFibYryLW2Kwz50bTuxbhJeV5L0iws6aCS41ka4fDOVe3mNFutW3hRWU1myWE2b8IlcKGFuMprtSgXzfj8X2_QA9UHT1wKclVeTL-V9fYt4ZSc_nGbMcRFgAArZhO5HzUqzvCc2Niwmne17G1ruCrByBrOrDIhpf2NcEmORw"/>
+</div>
+<div>
+<p class="text-sm font-bold text-on-surface">product_hero_final_v2.png</p>
+<p class="text-[11px] text-on-surface-variant font-medium">Upscale • 4x AI</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-xs font-medium px-3 py-1 bg-surface-container-high rounded-full text-on-secondary-fixed-variant">Enhance</span>
+</td>
+<td class="px-6 py-5">
+<p class="text-sm text-on-surface-variant">Oct 23, 2023</p>
+<p class="text-[11px] text-outline">16:45 PM</p>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-1.5 text-error">
+<span class="material-symbols-outlined text-sm" data-icon="error">error</span>
+<span class="text-xs font-bold">Failed</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="text-sm text-on-surface font-medium">0.0 MB</span>
+</td>
+<td class="px-6 py-5 text-right">
+<button class="p-2 opacity-0 group-hover:opacity-100 hover:bg-surface-container-high rounded-full transition-all">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="refresh">refresh</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="px-6 py-4 bg-surface-container-low/20 flex items-center justify-between">
+<p class="text-xs text-on-surface-variant font-medium">Showing 1-12 of 480 tasks</p>
+<div class="flex items-center gap-2">
+<button class="p-1.5 hover:bg-surface-container-high rounded-lg text-outline transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="chevron_left">chevron_left</span>
+</button>
+<span class="text-xs font-bold px-3 py-1 bg-primary text-on-primary rounded-md">1</span>
+<button class="text-xs font-medium px-3 py-1 hover:bg-surface-container-high rounded-md transition-colors">2</button>
+<button class="text-xs font-medium px-3 py-1 hover:bg-surface-container-high rounded-md transition-colors">3</button>
+<button class="p-1.5 hover:bg-surface-container-high rounded-lg text-outline transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Action Area / Empty State Style Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="p-8 rounded-2xl bg-gradient-to-br from-white to-surface-container-low border border-outline-variant/15 flex flex-col justify-center">
+<h3 class="text-xl font-bold mb-2">Automate your workflow</h3>
+<p class="text-sm text-on-surface-variant mb-6">Connect PicFacet to your favorite storage providers and sync your history automatically.</p>
+<div class="flex gap-4">
+<button class="px-6 py-2.5 bg-on-surface text-white rounded-full text-sm font-bold hover:bg-on-surface/90 transition-all">Setup Sync</button>
+<button class="px-6 py-2.5 bg-surface-container-high text-on-surface rounded-full text-sm font-bold hover:bg-surface-container-highest transition-all">Learn More</button>
+</div>
+</div>
+<div class="relative overflow-hidden rounded-2xl h-48 border border-outline-variant/15">
+<img class="absolute inset-0 w-full h-full object-cover" data-alt="minimalist 3D data visualization charts showing growth curves in soft pastel blue and white colors" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlrgTPGF7dTGMrgiztPuERcPUTIjlRBN89z2RotzzpEZ4fNJxmDu7EnNmZwzmOYmPXHWJp5QXaoRtyN_U1Ll8di0wG_ewfm0p_ctAokNa_-OVRpY_U-ragK9oQ3h9AINnHl1U06ORZF4kypInc8fQHI-ZPk_zwHkYj-B2rqhzvqIK5Log3Ea6Wzd61zanxEu7DREYbSBcM7GsPdkOT3Gt8ZM0Z-p63O_cm0JL5hfrK_LxAmgoceDbZBACm-Ul407oJzJ4LMfvOLjk"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-6 flex flex-col justify-end text-white">
+<p class="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Coming Soon</p>
+<h3 class="text-lg font-bold">Workspace Analytics</h3>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>
