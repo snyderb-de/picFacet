@@ -5,10 +5,11 @@ struct PicFacetApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        // No window shown at launch — app lives in the menu bar.
-        // Settings scene is opened by MenuBarController.
+        // Empty scene - app lives entirely in the menu bar
+        // Menu bar is created by AppDelegate -> MenuBarController
         Settings {
-            SettingsView()
+            EmptyView()
         }
     }
 }
+

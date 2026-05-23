@@ -3,16 +3,14 @@ import SwiftUI
 import PicFacetCore
 
 /// Floating picker shown when the user invokes the "PicFacet…" Quick Action.
-/// Styled after the right-hand control card of the Converter Workspace mockup
-/// (see mockups/picfacet_converter_light). Lists every operation we currently
-/// ship and runs the chosen one against the URLs Finder handed us.
+/// Now with thumbnails and consistent design matching the Batch Processor.
 final class ChooserWindowController {
     static let shared = ChooserWindowController()
 
     private var window: NSWindow?
 
     func show(urls: [URL]) {
-        let root = ChooserView(fileCount: urls.count) { [weak self] op in
+        let root = ChooserView(urls: urls) { [weak self] op in
             self?.run(op: op, urls: urls)
             self?.close()
         }
@@ -41,6 +39,18 @@ final class ChooserWindowController {
         let progress: (Int, Int) -> Void = { d, t in NSLog("[PicFacet] %d/%d", d, t) }
         let complete: (ProcessingResult) -> Void = { r in
             NSLog("[PicFacet] done ok=%d failed=%d", r.succeeded.count, r.failed.count)
+            // Show completion alert
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "Processing Complete"
+                alert.informativeText = "Successfully processed \(r.succeeded.count) file(s)."
+                if r.hasErrors {
+                    alert.informativeText += "\n\(r.failed.count) file(s) failed."
+                }
+                alert.alertStyle = r.hasErrors ? .warning : .informational
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
         }
         switch op {
         case .convert(let f):
@@ -64,18 +74,26 @@ enum ChooserOp: Hashable {
 // MARK: - View
 
 struct ChooserView: View {
-    let fileCount: Int
+    let urls: [URL]
     let onPick: (ChooserOp) -> Void
 
-    @State private var selectedFormat: ImageFormat? = nil
+    @State private var selectedFormat: ImageFormat? = PicFacetSettings.shared.defaultFormat
     @State private var selectedPercent: Int? = nil
-    @State private var dpi: Int = 300
+    @State private var dpi: Int = PicFacetSettings.shared.defaultDPI
+    @State private var thumbnails: [URL: NSImage] = [:]
 
     private let percents = [10, 25, 50, 75, 90]
+    
+    var fileCount: Int { urls.count }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
+            
+            // File thumbnails (always show if we have files)
+            if !urls.isEmpty {
+                thumbnailStrip
+            }
 
             PFCard {
                 formatSection
@@ -87,16 +105,109 @@ struct ChooserView: View {
         .padding(24)
         .frame(width: 460)
         .background(PFDesign.canvas)
+        .onAppear {
+            loadThumbnails()
+        }
+    }
+    
+    // MARK: - Thumbnails
+    
+    private var thumbnailStrip: some View {
+        HStack(spacing: 8) {
+            ForEach(urls.prefix(5), id: \.self) { url in
+                thumbnailView(for: url)
+            }
+            if urls.count > 5 {
+                Text("+\(urls.count - 5)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(PFDesign.onSurfaceVariant)
+                    .frame(width: 40, height: 40)
+                    .background(PFDesign.surfaceLow, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+        }
+    }
+    
+    private func thumbnailView(for url: URL) -> some View {
+        Group {
+            if let thumbnail = thumbnails[url] {
+                Image(nsImage: thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(PFDesign.outlineVariant.opacity(0.2), lineWidth: 1)
+                    }
+            } else {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(PFDesign.surfaceLow)
+                    .frame(width: 40, height: 40)
+                    .overlay {
+                        Image(systemName: "photo")
+                            .font(.system(size: 14))
+                            .foregroundStyle(PFDesign.onSurfaceVariant.opacity(0.5))
+                    }
+            }
+        }
+    }
+    
+    private func loadThumbnails() {
+        for url in urls.prefix(5) {
+            DispatchQueue.global(qos: .userInitiated).async {
+                if let thumbnail = createThumbnail(for: url) {
+                    DispatchQueue.main.async {
+                        thumbnails[url] = thumbnail
+                    }
+                }
+            }
+        }
+    }
+    
+    private func createThumbnail(for url: URL) -> NSImage? {
+        guard let image = NSImage(contentsOf: url) else { return nil }
+        
+        let size = NSSize(width: 40, height: 40)
+        let thumbnail = NSImage(size: size)
+        thumbnail.lockFocus()
+        
+        let aspectRatio = image.size.width / image.size.height
+        var drawRect = NSRect(origin: .zero, size: size)
+        
+        if aspectRatio > 1 {
+            let newHeight = size.width / aspectRatio
+            drawRect.origin.y = (size.height - newHeight) / 2
+            drawRect.size.height = newHeight
+        } else {
+            let newWidth = size.height * aspectRatio
+            drawRect.origin.x = (size.width - newWidth) / 2
+            drawRect.size.width = newWidth
+        }
+        
+        image.draw(in: drawRect)
+        thumbnail.unlockFocus()
+        
+        return thumbnail
     }
 
     // MARK: Header
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Converter")
-                .font(.system(size: 22, weight: .semibold))
-                .tracking(-0.4)
-                .foregroundStyle(PFDesign.onSurface)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Converter")
+                    .font(.system(size: 22, weight: .semibold))
+                    .tracking(-0.4)
+                    .foregroundStyle(PFDesign.onSurface)
+                
+                // Small badge showing count
+                Text("\(fileCount)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(PFDesign.primary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(PFDesign.primary.opacity(0.12), in: Capsule())
+            }
             Text("\(fileCount) image\(fileCount == 1 ? "" : "s") selected")
                 .font(.system(size: 12))
                 .foregroundStyle(PFDesign.onSurfaceVariant)

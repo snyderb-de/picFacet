@@ -2,13 +2,13 @@ name: PicFacet
 options:
   bundleIdPrefix: com.picfacet
   deploymentTarget:
-    macOS: "26.0"
+    macOS: "13.0"
   createIntermediateGroups: true
 
 settings:
   base:
     SWIFT_VERSION: "5"
-    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_STYLE: Automatic
 
@@ -17,7 +17,7 @@ targets:
   PicFacetCore:
     type: framework
     platform: macOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "13.0"
     sources:
       - PicFacetCore
     settings:
@@ -30,7 +30,7 @@ targets:
   PicFacet:
     type: application
     platform: macOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "13.0"
     sources:
       - PicFacet
     settings:

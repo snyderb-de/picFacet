@@ -26,7 +26,7 @@ Right-click any image (or batch of images) in Finder and pick a PicFacet Quick A
 - **Resize** by percent presets (10/25/50/75/90%)
 - **Change DPI** to 72 / 96 / 150 / 300 / 600 / 1200 / 2400 / 3600
 
-Or pick **PicFacet…** to get the full Liquid Glass picker window with every option in one place.
+Or pick **PicFacet…** to get the full picker window with every option in one place (Liquid Glass on macOS 26+, native fallback styling on older macOS).
 
 A menu bar icon hosts settings and a "How to enable Quick Actions…" helper.
 
@@ -68,8 +68,8 @@ The first cut of this project used a Finder Sync Extension (the heavy `FIFinderS
 
 ### Prerequisites
 
-- **macOS 26 (Tahoe)** — required for Liquid Glass
-- **Xcode 26+**
+- **macOS 13+** (Liquid Glass visual treatment appears on macOS 26+)
+- **Xcode 15+** (Xcode 26+ recommended for Tahoe-era APIs)
 - **Homebrew**
 - **xcodegen** (`brew install xcodegen`)
 

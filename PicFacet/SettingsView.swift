@@ -13,9 +13,29 @@ struct SettingsView: View {
     @State private var onlyIfSmaller: Bool = PicFacetSettings.shared.onlyIfSmaller
     @State private var deleteOriginalAfterConvert: Bool = PicFacetSettings.shared.deleteOriginalAfterConvert
     @State private var isProportional: Bool = PicFacetSettings.shared.isProportional
+    @State private var defaultFormat: ImageFormat = PicFacetSettings.shared.defaultFormat
+    @State private var defaultResizePercent: Int = PicFacetSettings.shared.defaultResizePercent
+    @State private var defaultDPI: Int = PicFacetSettings.shared.defaultDPI
 
     var body: some View {
         Form {
+            // Header with app icon/name
+            Section {
+                VStack(spacing: 8) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 36))
+                        .foregroundStyle(PFDesign.primary)
+                    Text("PicFacet")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(PFDesign.onSurface)
+                    Text("Image processing from anywhere")
+                        .font(.system(size: 12))
+                        .foregroundStyle(PFDesign.onSurfaceVariant)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
+            
             Section("General") {
                 LabeledContent {
                     Picker("", selection: $appearance) {
@@ -33,6 +53,52 @@ struct SettingsView: View {
                 } label: {
                     Text("Appearance")
                     Text("Choose a light or dark tint for the workspace.")
+                }
+            }
+            
+            Section("Defaults") {
+                LabeledContent {
+                    Picker("", selection: $defaultFormat) {
+                        ForEach(ImageFormat.allCases, id: \.self) { format in
+                            Text(format.displayName).tag(format)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 140)
+                    .onChange(of: defaultFormat) { PicFacetSettings.shared.defaultFormat = $0 }
+                } label: {
+                    Text("Default format")
+                    Text("Pre-selected format in the converter.")
+                }
+                
+                LabeledContent {
+                    Picker("", selection: $defaultResizePercent) {
+                        Text("10%").tag(10)
+                        Text("25%").tag(25)
+                        Text("50%").tag(50)
+                        Text("75%").tag(75)
+                        Text("90%").tag(90)
+                    }
+                    .labelsHidden()
+                    .frame(width: 100)
+                    .onChange(of: defaultResizePercent) { PicFacetSettings.shared.defaultResizePercent = $0 }
+                } label: {
+                    Text("Default resize")
+                    Text("Pre-selected resize percentage.")
+                }
+                
+                LabeledContent {
+                    Picker("", selection: $defaultDPI) {
+                        ForEach(PicFacetSettings.dpiOptions, id: \.self) { dpi in
+                            Text("\(dpi) DPI").tag(dpi)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 120)
+                    .onChange(of: defaultDPI) { PicFacetSettings.shared.defaultDPI = $0 }
+                } label: {
+                    Text("Default DPI")
+                    Text("Pre-selected DPI setting.")
                 }
             }
 
@@ -65,7 +131,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 560)
+        .frame(width: 580, height: 680)
     }
 
     private func applyAppearance(_ value: PicFacetSettings.AppAppearance) {

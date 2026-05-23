@@ -33,6 +33,10 @@ struct ConversionEngine {
             1,
             nil
         ) else {
+            // Special message for WebP
+            if format == .webp {
+                throw PicFacetError.customError("WebP encoding is not available on this macOS version. Try JPEG or PNG instead.")
+            }
             throw PicFacetError.writeFailed(url)
         }
 
