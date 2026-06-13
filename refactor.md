@@ -1,5 +1,9 @@
 # PicFacet Refactor — Shared Container IPC
 
+> Historical note: this document describes the abandoned Finder Sync Extension
+> path. The current app uses NSServices in the main app process instead. Keep
+> this file as background, not as the active architecture plan.
+
 ## Why the current code fails
 
 The extension → main-app bridge relies on `NSWorkspace.shared.open("picfacet://…")`. On modern macOS, a **sandboxed Finder Sync Extension cannot call `NSWorkspace.open` on a custom URL scheme** — the call is silently denied by the sandbox. No logs, no errors, no file work. That's exactly what we're seeing.

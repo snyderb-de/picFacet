@@ -9,10 +9,11 @@ A native macOS app that adds right-click **Quick Actions** in Finder for convert
 **The Xcode project is not committed to this repo.** It's regenerated from `project.yml` by [xcodegen](https://github.com/yonaskolb/XcodeGen). After cloning you **must** run:
 
 ```bash
-brew install xcodegen      # one time, if you don't have it
-xcodegen generate          # creates PicFacet.xcodeproj
+nix shell nixpkgs#xcodegen -c xcodegen generate # preferred, if you use Nix
 open PicFacet.xcodeproj
 ```
+
+No Nix? `brew install xcodegen` is fine.
 
 If you skip this, there is no `.xcodeproj` to open. Re-run `xcodegen generate` any time you add, remove, or rename a source file.
 
@@ -26,9 +27,9 @@ Right-click any image (or batch of images) in Finder and pick a PicFacet Quick A
 - **Resize** by percent presets (10/25/50/75/90%)
 - **Change DPI** to 72 / 96 / 150 / 300 / 600 / 1200 / 2400 / 3600
 
-Or pick **PicFacet…** to get the full picker window with every option in one place (Liquid Glass on macOS 26+, native fallback styling on older macOS).
+Or pick **PicFacet…** to get the full picker window with every option in one place.
 
-A menu bar icon hosts settings and a "How to enable Quick Actions…" helper.
+A menu bar icon hosts settings, a batch processor, and a "How to enable Quick Actions…" helper.
 
 ---
 
@@ -41,7 +42,7 @@ PicFacet.xcodeproj           (generated — gitignored)
 │   ├── PicFacetApp.swift
 │   ├── AppDelegate.swift          — registers NSApp.servicesProvider
 │   ├── ServiceProvider.swift      — @objc handlers for every Quick Action
-│   ├── ChooserWindow.swift        — Liquid Glass picker for "PicFacet…"
+│   ├── ChooserWindow.swift        — full picker window for "PicFacet…"
 │   ├── OnboardingWindow.swift     — first-launch help window
 │   ├── MenuBarController.swift    — NSStatusItem + settings
 │   └── SettingsView.swift
@@ -53,6 +54,7 @@ PicFacet.xcodeproj           (generated — gitignored)
     ├── ResizeEngine.swift         — CGContext high-quality resize
     ├── DPIEngine.swift            — per-format DPI metadata patching
     ├── FileOutputManager.swift    — output paths, dedup, overwrite rules
+    ├── ProgressWindow.swift       — drag-and-drop batch processor
     ├── PicFacetSettings.swift     — UserDefaults model
     ├── ProcessingResult.swift
     └── PicFacetError.swift
@@ -68,16 +70,16 @@ The first cut of this project used a Finder Sync Extension (the heavy `FIFinderS
 
 ### Prerequisites
 
-- **macOS 13+** (Liquid Glass visual treatment appears on macOS 26+)
+- **macOS 13+**
 - **Xcode 15+** (Xcode 26+ recommended for Tahoe-era APIs)
-- **Homebrew**
-- **xcodegen** (`brew install xcodegen`)
+- **Nix** preferred, or **Homebrew**
+- **xcodegen** (`nix shell nixpkgs#xcodegen` or `brew install xcodegen`)
 
 ### Build & run
 
 ```bash
-xcodegen generate
-open PicFacet.xcodeproj
+nix shell nixpkgs#xcodegen -c xcodegen generate
+./script/build_and_run.sh
 ```
 
 In Xcode: select the **PicFacet** target → **Signing & Capabilities** → set your Team (free Personal Team is fine for local testing). Then **⌘R**.
@@ -130,10 +132,18 @@ You should see `[PicFacet] Service fired — N image(s)` after each click.
 - [x] Phase 1 — Project scaffold (xcodegen)
 - [x] Phase 2 — Image engine (convert/resize/DPI, all formats incl. HEIC)
 - [x] Phase 3 — NSServices Quick Actions (14 ops + chooser)
-- [x] Phase 3.5 — Liquid Glass chooser window + onboarding
-- [ ] Phase 4 — Custom input panels (By Percent / Max Width / Max Height with proportional toggle)
+- [x] Phase 3.5 — full chooser window + onboarding
+- [ ] Phase 4 — Custom input panels (partial: engine supports max width/height; UI still needs custom inputs)
 - [ ] Phase 5 — Menu bar progress indicator
-- [ ] Phase 6 — Full settings window
+- [x] Phase 6 — Full settings window
 - [ ] Phase 7 — App icon, DMG, notarization
 - [ ] Phase 8 — Pricing research ($1.99–$2.99 target)
 - [ ] Phase 9 — Mac App Store submission
+
+## Current Gaps
+
+- Verify Finder Quick Actions end-to-end after each generated build.
+- Add custom resize inputs: percent, max width, max height, proportional toggle.
+- Add menu bar progress while batches are running.
+- Replace the generated/menu-bar symbol with final app icon assets.
+- Prepare packaging, signing, notarization, and Mac App Store metadata.

@@ -1,26 +1,27 @@
+import AppKit
 import SwiftUI
 
-/// "Ethereal Workspace" design tokens — see mockups/DESIGN.md.
-/// Tonal layering (white-on-white), precision blue accents, ghost borders,
-/// pill chips and a gradient primary CTA. Kept intentionally small so the
-/// real UI files stay readable.
-///
-/// Now with Liquid Glass support for macOS 15+ and graceful fallback for older versions.
+/// Shared PicFacet design tokens.
+/// The visual goal is a premium Mac utility: crisp hierarchy, native material,
+/// restrained color, and controls that look trustworthy around user files.
 enum PFDesign {
     // MARK: Surfaces
-    static let canvas           = Color(hex: 0xF9F9FB) // surface / base canvas
-    static let surfaceLow       = Color(hex: 0xF3F3F5) // recessed
-    static let surfaceLowest    = Color(hex: 0xFFFFFF) // elevated card
-    static let surfaceHigh      = Color(hex: 0xE8E8EA) // secondary button / unselected chip
+    static let canvas           = Color.adaptive(light: 0xF6F7F9, dark: 0x111418)
+    static let surfaceLow       = Color.adaptive(light: 0xECEFF3, dark: 0x1B2026)
+    static let surfaceLowest    = Color.adaptive(light: 0xFFFFFF, dark: 0x242A32)
+    static let surfaceHigh      = Color.adaptive(light: 0xDDE3EA, dark: 0x303842)
+    static let chrome           = Color.adaptive(light: 0xFBFCFE, dark: 0x181D23, alpha: 0.86)
 
     // MARK: Ink
-    static let onSurface        = Color(hex: 0x1A1C1D)
-    static let onSurfaceVariant = Color(hex: 0x5E6272)
-    static let outlineVariant   = Color(hex: 0xC1C6D7)
+    static let onSurface        = Color.adaptive(light: 0x161A1F, dark: 0xF5F7FA)
+    static let onSurfaceVariant = Color.adaptive(light: 0x5D6673, dark: 0xB7C0CC)
+    static let outlineVariant   = Color.adaptive(light: 0xBCC6D2, dark: 0x485360)
 
     // MARK: Accent
-    static let primary          = Color(hex: 0x0058BC)
-    static let primaryBright    = Color(hex: 0x0070EB)
+    static let primary          = Color.adaptive(light: 0x005BBF, dark: 0x5AA9FF)
+    static let primaryBright    = Color.adaptive(light: 0x0078FF, dark: 0x8ECBFF)
+    static let success          = Color.adaptive(light: 0x0A7A4B, dark: 0x53D18C)
+    static let amber            = Color.adaptive(light: 0x9B5B00, dark: 0xF0B44D)
     static let primaryGradient  = LinearGradient(
         colors: [primary, primaryBright],
         startPoint: .topLeading,
@@ -28,29 +29,20 @@ enum PFDesign {
     )
 
     // MARK: Radii
-    static let rCard: CGFloat  = 20
-    static let rInner: CGFloat = 14
-    
-    // MARK: - Liquid Glass Support
-    
-    /// Check if Liquid Glass is available (macOS 26.0+)
-    @available(macOS 26.0, *)
-    static var supportsLiquidGlass: Bool {
-        return true
-    }
-    
-    /// Returns true if current OS supports Liquid Glass
-    static var canUseLiquidGlass: Bool {
-        if #available(macOS 26.0, *) {
-            return true
-        }
-        return false
-    }
+    static let rCard: CGFloat  = 8
+    static let rInner: CGFloat = 8
 }
 
 // MARK: - Color hex helper
 
 extension Color {
+    static func adaptive(light: UInt32, dark: UInt32, alpha: Double = 1) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return NSColor(hex: isDark ? dark : light, alpha: alpha)
+        })
+    }
+
     init(hex: UInt32, alpha: Double = 1) {
         self.init(
             .sRGB,
@@ -62,7 +54,18 @@ extension Color {
     }
 }
 
-// MARK: - Card container with Liquid Glass
+private extension NSColor {
+    convenience init(hex: UInt32, alpha: Double = 1) {
+        self.init(
+            srgbRed: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            alpha: alpha
+        )
+    }
+}
+
+// MARK: - Card container
 
 struct PFCard<Content: View>: View {
     let content: () -> Content
@@ -71,30 +74,50 @@ struct PFCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) { content() }
             .padding(22)
-            .modifier(CardBackgroundModifier())
+            .modifier(PFPanelBackground(interactive: false))
     }
 }
 
-/// Applies Liquid Glass effect on macOS 26+ or falls back to traditional design
-private struct CardBackgroundModifier: ViewModifier {
+struct PFPanelBackground: ViewModifier {
+    var interactive: Bool = false
+
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
-            // Modern Liquid Glass effect
-            content
-                .glassEffect(.regular.tint(PFDesign.primary.opacity(0.03)), 
-                           in: .rect(cornerRadius: PFDesign.rCard))
-                .shadow(color: PFDesign.onSurface.opacity(0.08), radius: 40, x: 0, y: 12)
+            if interactive {
+                content
+                    .background(PFDesign.chrome, in: RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous))
+                    .glassEffect(.regular.tint(PFDesign.chrome.opacity(0.34)).interactive(), in: .rect(cornerRadius: PFDesign.rCard))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous)
+                            .strokeBorder(PFDesign.outlineVariant.opacity(0.18), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.12), radius: 28, x: 0, y: 14)
+            } else {
+                content
+                    .background(PFDesign.chrome, in: RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous))
+                    .glassEffect(.regular.tint(PFDesign.chrome.opacity(0.34)), in: .rect(cornerRadius: PFDesign.rCard))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous)
+                            .strokeBorder(PFDesign.outlineVariant.opacity(0.18), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.12), radius: 28, x: 0, y: 14)
+            }
         } else {
-            // Fallback: Original white card with ghost border
             content
-                .background(PFDesign.surfaceLowest, 
+                .background(PFDesign.surfaceLowest,
                           in: RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous)
                         .strokeBorder(PFDesign.outlineVariant.opacity(0.15), lineWidth: 1)
                 )
-                .shadow(color: PFDesign.onSurface.opacity(0.05), radius: 30, x: 0, y: 8)
+                .shadow(color: Color.black.opacity(0.08), radius: 26, x: 0, y: 12)
         }
+    }
+}
+
+extension View {
+    func pfPanel(interactive: Bool = false) -> some View {
+        modifier(PFPanelBackground(interactive: interactive))
     }
 }
 
@@ -109,11 +132,12 @@ struct PFSectionLabel: View {
     }
 }
 
-// MARK: - Selection chip (pill) with Liquid Glass
+// MARK: - Selection chip
 
 struct PFChip: View {
     let title: String
     let isSelected: Bool
+    var systemImage: String? = nil
     let action: () -> Void
 
     @State private var hovering = false
@@ -121,17 +145,23 @@ struct PFChip: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .foregroundStyle(isSelected ? .white : PFDesign.onSurface)
-                .modifier(ChipBackgroundModifier(isSelected: isSelected, 
-                                                hovering: hovering, 
-                                                pressing: pressing))
-                .scaleEffect(pressing ? 0.96 : 1.0)
-                .animation(.easeInOut(duration: 0.12), value: pressing)
-                .animation(.easeInOut(duration: 0.15), value: hovering)
+            HStack(spacing: 6) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 8)
+            .foregroundStyle(isSelected ? .white : PFDesign.onSurface)
+            .modifier(ChipBackgroundModifier(isSelected: isSelected,
+                                            hovering: hovering,
+                                            pressing: pressing))
+            .scaleEffect(pressing ? 0.96 : 1.0)
+            .animation(.easeInOut(duration: 0.12), value: pressing)
+            .animation(.easeInOut(duration: 0.15), value: hovering)
         }
         .buttonStyle(.plain)
         .simultaneousGesture(
@@ -143,116 +173,103 @@ struct PFChip: View {
     }
 }
 
-/// Chip background with Liquid Glass support
 private struct ChipBackgroundModifier: ViewModifier {
     let isSelected: Bool
     let hovering: Bool
     let pressing: Bool
     
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            // Modern Liquid Glass chips
-            if isSelected {
-                content
-                    .background {
-                        Capsule(style: .continuous)
-                            .fill(PFDesign.primaryGradient)
-                    }
-                    .glassEffect(.regular.tint(PFDesign.primary.opacity(0.15)).interactive(), 
-                               in: .capsule)
-                    .shadow(color: PFDesign.primary.opacity(pressing ? 0.15 : 0.25), 
-                           radius: pressing ? 6 : 12, x: 0, y: pressing ? 2 : 6)
-            } else {
-                content
-                    .background {
-                        Capsule(style: .continuous)
-                            .fill(hovering ? PFDesign.surfaceLow : PFDesign.surfaceHigh)
-                    }
-                    .glassEffect(.regular.interactive(hovering), in: .capsule)
+        content
+            .background {
+                RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
+                    .fill(isSelected ? AnyShapeStyle(PFDesign.primaryGradient) : AnyShapeStyle(hovering ? PFDesign.surfaceLowest : PFDesign.surfaceLow))
             }
-        } else {
-            // Fallback: Original design
-            content
-                .background {
-                    if isSelected {
-                        Capsule(style: .continuous)
-                            .fill(PFDesign.primaryGradient)
-                            .shadow(color: PFDesign.primary.opacity(pressing ? 0.1 : 0.2), 
-                                   radius: pressing ? 4 : 8, x: 0, y: pressing ? 2 : 4)
-                    } else {
-                        Capsule(style: .continuous)
-                            .fill(hovering ? PFDesign.surfaceLow : PFDesign.surfaceHigh)
-                    }
-                }
-        }
+            .overlay {
+                RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
+                    .strokeBorder(isSelected ? PFDesign.primaryBright.opacity(0.5) : PFDesign.outlineVariant.opacity(0.2), lineWidth: 1)
+            }
+            .shadow(color: isSelected ? PFDesign.primary.opacity(pressing ? 0.08 : 0.16) : .clear,
+                    radius: pressing ? 3 : 7,
+                    x: 0,
+                    y: pressing ? 1 : 3)
     }
 }
 
-// MARK: - Primary CTA (gradient pill) with Liquid Glass
+// MARK: - Primary CTA
 
 struct PFPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
-        if #available(macOS 26.0, *) {
-            // Modern Liquid Glass button
-            configuration.label
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background {
-                    Capsule(style: .continuous)
-                        .fill(PFDesign.primaryGradient)
-                }
-                .glassEffect(.regular.tint(PFDesign.primaryBright.opacity(0.2)).interactive(), 
-                           in: .capsule)
-                .shadow(color: PFDesign.primary.opacity(0.3), radius: 18, x: 0, y: 8)
-                .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-                .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
-        } else {
-            // Fallback: Original design
-            configuration.label
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(PFDesign.primaryGradient, in: Capsule(style: .continuous))
-                .shadow(color: PFDesign.primary.opacity(0.25), radius: 14, x: 0, y: 6)
-                .opacity(configuration.isPressed ? 0.85 : 1)
-        }
+        configuration.label
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 13)
+            .background(PFDesign.primaryGradient, in: RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
+                    .strokeBorder(Color.white.opacity(isEnabled ? 0.22 : 0), lineWidth: 1)
+            }
+            .shadow(color: PFDesign.primary.opacity(isEnabled ? 0.28 : 0), radius: 14, x: 0, y: 7)
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+            .opacity(isEnabled ? 1 : 0.38)
+            .animation(.easeInOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
-// MARK: - Secondary button (ghost / tertiary) with Liquid Glass
+// MARK: - Secondary button
 
 struct PFSecondaryButtonStyle: ButtonStyle {
     @State private var hovering = false
     
     func makeBody(configuration: Configuration) -> some View {
-        if #available(macOS 26.0, *) {
-            // Modern Liquid Glass secondary button
-            configuration.label
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(PFDesign.onSurface)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background {
-                    Capsule(style: .continuous)
-                        .fill(PFDesign.surfaceHigh)
-                }
-                .glassEffect(.regular.interactive(hovering), in: .capsule)
-                .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-                .animation(.easeInOut(duration: 0.12), value: configuration.isPressed)
-                .onHover { hovering = $0 }
-        } else {
-            // Fallback: Original design
-            configuration.label
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(PFDesign.onSurface)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(PFDesign.surfaceHigh, in: Capsule(style: .continuous))
-                .opacity(configuration.isPressed ? 0.85 : 1)
-                .onHover { hovering = $0 }
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(PFDesign.onSurface)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(hovering ? PFDesign.surfaceLowest : PFDesign.surfaceLow,
+                        in: RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
+                    .strokeBorder(PFDesign.outlineVariant.opacity(0.16), lineWidth: 1)
+            }
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .onHover { hovering = $0 }
+    }
+}
+
+struct PFStatPill: View {
+    let icon: String
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(PFDesign.primary)
+                .frame(width: 24, height: 24)
+                .background(PFDesign.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(PFDesign.onSurfaceVariant)
+                    .textCase(.uppercase)
+                Text(value)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(PFDesign.onSurface)
+                    .lineLimit(1)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PFDesign.surfaceLow, in: RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
+                .strokeBorder(PFDesign.outlineVariant.opacity(0.16), lineWidth: 1)
         }
     }
 }
@@ -356,14 +373,13 @@ struct PFInfoRow: View {
 }
 // MARK: - Preview & Demo
 
-#Preview("Liquid Glass Design System") {
+#Preview("PicFacet Design System") {
     VStack(spacing: 24) {
         // Header
         VStack(spacing: 4) {
             Text("Ethereal Workspace")
                 .font(.system(size: 28, weight: .semibold))
-                .tracking(-0.5)
-            Text("with Liquid Glass on macOS 15+")
+            Text("native macOS controls, adaptive light and dark surfaces")
                 .font(.system(size: 12))
                 .foregroundStyle(PFDesign.onSurfaceVariant)
         }
@@ -373,7 +389,7 @@ struct PFInfoRow: View {
             VStack(alignment: .leading, spacing: 12) {
                 PFSectionLabel(text: "Card Example")
                 
-                Text("This card uses Liquid Glass on macOS 15+ for a fluid, modern look. On older versions, it falls back to a beautiful white card with ghost borders.")
+                Text("This card uses quiet tonal layering, crisp borders, and adaptive colors that hold up in light and dark mode.")
                     .font(.system(size: 12))
                     .foregroundStyle(PFDesign.onSurface)
                 
@@ -389,7 +405,7 @@ struct PFInfoRow: View {
                 
                 // Info rows
                 PFInfoRow(label: "Design System", value: "Ethereal Workspace")
-                PFInfoRow(label: "Material", value: PFDesign.canUseLiquidGlass ? "Liquid Glass" : "Classic")
+                PFInfoRow(label: "Material", value: "Native")
                 
                 // Buttons
                 HStack(spacing: 12) {
@@ -406,4 +422,3 @@ struct PFInfoRow: View {
     .frame(width: 500)
     .background(PFDesign.canvas)
 }
-

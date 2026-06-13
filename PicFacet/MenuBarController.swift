@@ -11,12 +11,6 @@ final class MenuBarController {
         
         NSLog("[MenuBar] Initializing menu bar...")
         
-        // TEMPORARY DEBUG: Show emoji to confirm menu bar is working
-        if let button = statusItem.button {
-            button.title = "📷"
-            NSLog("[MenuBar] Set temporary emoji icon")
-        }
-        
         configureButton()
         buildMenu()
         NSLog("[MenuBar] Menu bar initialized")
@@ -86,6 +80,10 @@ final class MenuBarController {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        let appearanceItem = NSMenuItem(title: "Appearance", action: nil, keyEquivalent: "")
+        appearanceItem.submenu = appearanceMenu()
+        menu.addItem(appearanceItem)
+
         let howTo = NSMenuItem(title: "How to enable Quick Actions…",
                                action: #selector(openOnboarding),
                                keyEquivalent: "")
@@ -100,6 +98,25 @@ final class MenuBarController {
 
         statusItem.menu = menu
     }
+
+    private func appearanceMenu() -> NSMenu {
+        let menu = NSMenu()
+        let current = PicFacetSettings.shared.appAppearance
+
+        for appearance in PicFacetSettings.AppAppearance.allCases {
+            let item = NSMenuItem(
+                title: appearance.menuTitle,
+                action: #selector(setAppearance(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = appearance.rawValue
+            item.state = appearance == current ? .on : .off
+            menu.addItem(item)
+        }
+
+        return menu
+    }
     
     @objc private func openBatchProcessor() {
         ProgressWindowController.shared.show()
@@ -109,13 +126,14 @@ final class MenuBarController {
         if settingsWindow == nil {
             let view = NSHostingView(rootView: SettingsView())
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
-                styleMask: [.titled, .closable],
+                contentRect: NSRect(x: 0, y: 0, width: 580, height: 680),
+                styleMask: [.titled, .closable, .resizable],
                 backing: .buffered,
                 defer: false
             )
             window.title = "PicFacet Settings"
             window.contentView = view
+            window.minSize = NSSize(width: 520, height: 560)
             window.center()
             window.isReleasedWhenClosed = false
             settingsWindow = window
@@ -126,5 +144,37 @@ final class MenuBarController {
 
     @objc private func openOnboarding() {
         OnboardingWindowController.shared.show()
+    }
+
+    @objc private func setAppearance(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let appearance = PicFacetSettings.AppAppearance(rawValue: rawValue) else {
+            return
+        }
+
+        PicFacetSettings.shared.appAppearance = appearance
+        applyAppearance(appearance)
+        buildMenu()
+    }
+
+    private func applyAppearance(_ appearance: PicFacetSettings.AppAppearance) {
+        switch appearance {
+        case .system:
+            NSApp.appearance = nil
+        case .light:
+            NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark:
+            NSApp.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
+private extension PicFacetSettings.AppAppearance {
+    var menuTitle: String {
+        switch self {
+        case .system: "System"
+        case .light: "Light"
+        case .dark: "Dark"
+        }
     }
 }

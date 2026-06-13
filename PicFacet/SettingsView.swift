@@ -73,11 +73,9 @@ struct SettingsView: View {
                 
                 LabeledContent {
                     Picker("", selection: $defaultResizePercent) {
-                        Text("10%").tag(10)
                         Text("25%").tag(25)
                         Text("50%").tag(50)
                         Text("75%").tag(75)
-                        Text("90%").tag(90)
                     }
                     .labelsHidden()
                     .frame(width: 100)

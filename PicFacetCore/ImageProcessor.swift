@@ -48,6 +48,22 @@ public final class ImageProcessor {
 
     public func resize(
         _ urls: [URL],
+        operation: ResizeOperation,
+        onProgress: @escaping (Int, Int) -> Void,
+        onComplete: @escaping (ProcessingResult) -> Void
+    ) {
+        switch operation {
+        case .percent(let percent):
+            resize(urls, byPercent: Double(percent), onProgress: onProgress, onComplete: onComplete)
+        case .width(let width):
+            resize(urls, maxWidth: width, onProgress: onProgress, onComplete: onComplete)
+        case .height(let height):
+            resize(urls, maxHeight: height, onProgress: onProgress, onComplete: onComplete)
+        }
+    }
+
+    public func resize(
+        _ urls: [URL],
         maxWidth width: Int,
         onProgress: @escaping (Int, Int) -> Void,
         onComplete: @escaping (ProcessingResult) -> Void

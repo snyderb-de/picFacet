@@ -27,8 +27,9 @@ public final class ProgressWindowController {
             win.title = "PicFacet Processing"
             win.isReleasedWhenClosed = false
             win.level = .floating
-            win.backgroundColor = NSColor(red: 0.976, green: 0.976, blue: 0.984, alpha: 1.0)
-            win.setContentSize(NSSize(width: 520, height: 640))
+            win.backgroundColor = .windowBackgroundColor
+            win.setContentSize(NSSize(width: 880, height: 680))
+            win.minSize = NSSize(width: 780, height: 600)
             win.center()
             window = win
         } else {
@@ -47,26 +48,58 @@ public final class ProgressWindowController {
 // MARK: - Minimal Design Tokens (until moved to main app)
 
 private enum ProgressDesign {
-    static let canvas = Color(red: 0.976, green: 0.976, blue: 0.984)
-    static let surface = Color.white
-    static let surfaceLow = Color(red: 0.953, green: 0.953, blue: 0.961)
-    static let surfaceHigh = Color(red: 0.910, green: 0.910, blue: 0.918)
+    static let canvas = Color.adaptive(light: 0xF6F7F9, dark: 0x111418)
+    static let surface = Color.adaptive(light: 0xFFFFFF, dark: 0x242A32)
+    static let surfaceLow = Color.adaptive(light: 0xECEFF3, dark: 0x1B2026)
+    static let surfaceHigh = Color.adaptive(light: 0xDDE3EA, dark: 0x303842)
+    static let chrome = Color.adaptive(light: 0xFBFCFE, dark: 0x181D23, alpha: 0.86)
     
-    static let onSurface = Color(red: 0.102, green: 0.110, blue: 0.114)
-    static let onSurfaceVariant = Color(red: 0.369, green: 0.384, blue: 0.447)
-    static let outlineVariant = Color(red: 0.757, green: 0.776, blue: 0.843)
+    static let onSurface = Color.adaptive(light: 0x161A1F, dark: 0xF5F7FA)
+    static let onSurfaceVariant = Color.adaptive(light: 0x5D6673, dark: 0xB7C0CC)
+    static let outlineVariant = Color.adaptive(light: 0xBCC6D2, dark: 0x485360)
     
-    static let primary = Color(red: 0.0, green: 0.345, blue: 0.737)
-    static let primaryBright = Color(red: 0.0, green: 0.439, blue: 0.922)
+    static let primary = Color.adaptive(light: 0x005BBF, dark: 0x5AA9FF)
+    static let primaryBright = Color.adaptive(light: 0x0078FF, dark: 0x8ECBFF)
+    static let success = Color.adaptive(light: 0x0A7A4B, dark: 0x53D18C)
     
     static let primaryGradient = LinearGradient(
         colors: [primary, primaryBright],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
+
+    static let rInner: CGFloat = 8
+}
+
+private extension Color {
+    static func adaptive(light: UInt32, dark: UInt32, alpha: Double = 1) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return NSColor(hex: isDark ? dark : light, alpha: alpha)
+        })
+    }
+}
+
+private extension NSColor {
+    convenience init(hex: UInt32, alpha: Double = 1) {
+        self.init(
+            srgbRed: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            alpha: alpha
+        )
+    }
 }
 
 // MARK: - SwiftUI View
+
+private enum BatchResizeMode: Hashable {
+    case none
+    case percent(Int)
+    case customPercent
+    case width
+    case height
+}
 
 struct ProgressView: View {
     @State private var files: [FileItem]
@@ -76,33 +109,75 @@ struct ProgressView: View {
     
     // Multiple operation settings
     @State private var selectedFormat: ImageFormat? = nil
-    @State private var selectedResize: Int? = nil
+    @State private var selectedResizeMode: BatchResizeMode = .none
+    @State private var customPercentText = ""
+    @State private var widthText = ""
+    @State private var heightText = ""
     @State private var selectedDPI: Int? = nil
+
+    private var selectedResize: ResizeOperation? {
+        switch selectedResizeMode {
+        case .none:
+            return nil
+        case .percent(let percent):
+            return .percent(percent)
+        case .customPercent:
+            guard let value = positiveInt(customPercentText) else { return nil }
+            return .percent(value)
+        case .width:
+            guard let value = positiveInt(widthText) else { return nil }
+            return .width(value)
+        case .height:
+            guard let value = positiveInt(heightText) else { return nil }
+            return .height(value)
+        }
+    }
+
+    private var resizeInputIsValid: Bool {
+        switch selectedResizeMode {
+        case .none, .percent:
+            return true
+        case .customPercent, .width, .height:
+            return selectedResize != nil
+        }
+    }
     
     init(initialFiles: [URL]) {
         _files = State(initialValue: initialFiles.map { FileItem(url: $0) })
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            headerView
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                .padding(.bottom, 16)
-            
-            // Main content area
-            if files.isEmpty {
-                dropZoneView
-            } else {
-                fileListView
+        HStack(alignment: .top, spacing: 22) {
+            VStack(spacing: 18) {
+                headerView
+
+                if files.isEmpty {
+                    dropZoneView
+                } else {
+                    fileListView
+                }
             }
-            
-            // Bottom controls
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
             controlsView
-                .padding(24)
+                .frame(width: 310)
         }
-        .background(ProgressDesign.canvas)
+        .padding(30)
+        .frame(width: 880, height: 680)
+        .background {
+            ZStack {
+                ProgressDesign.canvas
+                LinearGradient(
+                    colors: [
+                        ProgressDesign.primary.opacity(0.10),
+                        ProgressDesign.success.opacity(0.04),
+                        Color.clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
         .onDrop(of: [.fileURL], isTargeted: $isDraggingOver) { providers in
             handleDrop(providers: providers)
         }
@@ -111,31 +186,30 @@ struct ProgressView: View {
     // MARK: - Header
     
     private var headerView: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .center, spacing: 14) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text("Batch Processor")
-                    .font(.system(size: 22, weight: .semibold))
-                    .tracking(-0.4)
+                    .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(ProgressDesign.onSurface)
-                
-                if !files.isEmpty {
-                    Text("\(files.count)")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(ProgressDesign.primary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(ProgressDesign.primary.opacity(0.12), in: Capsule())
-                }
-            }
-            
-            if isProcessing {
-                Text("Processing…")
-                    .font(.system(size: 12))
-                    .foregroundStyle(ProgressDesign.primary)
-            } else if !files.isEmpty {
-                Text("Ready to process")
-                    .font(.system(size: 12))
+
+                Text(isProcessing ? "Processing..." : files.isEmpty ? "Drop images to begin" : "Ready to process")
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(ProgressDesign.onSurfaceVariant)
+            }
+
+            Spacer()
+
+            if !files.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: isProcessing ? "gearshape.2.fill" : "photo.stack")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("\(files.count)")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(ProgressDesign.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(ProgressDesign.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
         }
     }
@@ -143,7 +217,7 @@ struct ProgressView: View {
     // MARK: - Drop Zone
     
     private var dropZoneView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 18) {
             Spacer()
             
             Image(systemName: isDraggingOver ? "photo.badge.plus.fill" : "photo.on.rectangle.angled")
@@ -161,7 +235,7 @@ struct ProgressView: View {
                     .foregroundStyle(ProgressDesign.onSurfaceVariant)
             }
             
-            Button("Select Files…") {
+            Button("Select Files...") {
                 selectFiles()
             }
             .buttonStyle(SecondaryButtonStyle())
@@ -181,7 +255,7 @@ struct ProgressView: View {
                         .fill(isDraggingOver ? ProgressDesign.primary.opacity(0.05) : Color.clear)
                 )
         }
-        .padding(24)
+        .pfCardBackground()
         .animation(.easeInOut(duration: 0.2), value: isDraggingOver)
     }
     
@@ -200,7 +274,7 @@ struct ProgressView: View {
                 Button {
                     files.removeAll()
                     selectedFormat = nil
-                    selectedResize = nil
+                    selectedResizeMode = .none
                     selectedDPI = nil
                     isProcessing = false
                 } label: {
@@ -210,7 +284,6 @@ struct ProgressView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 24)
             .padding(.bottom, 12)
             
             // Scrollable file list
@@ -220,15 +293,16 @@ struct ProgressView: View {
                         FileItemRow(item: file)
                     }
                 }
-                .padding(.horizontal, 24)
             }
             
             // Progress indicator (when processing)
             if isProcessing {
                 ProgressIndicatorView(current: currentProgress, total: files.count)
-                    .padding(24)
+                    .padding(.top, 14)
             }
         }
+        .padding(18)
+        .pfCardBackground()
     }
     
     // MARK: - Controls
@@ -236,7 +310,13 @@ struct ProgressView: View {
     private var controlsView: some View {
         CardView {
             VStack(alignment: .leading, spacing: 14) {
-                SectionLabel(text: "Processing Options")
+                HStack {
+                    SectionLabel(text: "Processing Options")
+                    Spacer()
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(ProgressDesign.primary)
+                }
                 
                 // Format picker
                 HStack {
@@ -258,24 +338,35 @@ struct ProgressView: View {
                 }
                 
                 // Resize picker
-                HStack {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
                     Text("Resize")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(ProgressDesign.onSurfaceVariant)
                         .frame(width: 60, alignment: .leading)
                     
-                    Picker("", selection: $selectedResize) {
-                        Text("Leave as-is").tag(nil as Int?)
-                        Text("10%").tag(Optional(10))
-                        Text("25%").tag(Optional(25))
-                        Text("50%").tag(Optional(50))
-                        Text("75%").tag(Optional(75))
-                        Text("90%").tag(Optional(90))
+                    Picker("", selection: $selectedResizeMode) {
+                        Text("Leave as-is").tag(BatchResizeMode.none)
+                        Text("25%").tag(BatchResizeMode.percent(25))
+                        Text("50%").tag(BatchResizeMode.percent(50))
+                        Text("75%").tag(BatchResizeMode.percent(75))
+                        Text("Custom %").tag(BatchResizeMode.customPercent)
+                        Text("Set width").tag(BatchResizeMode.width)
+                        Text("Set height").tag(BatchResizeMode.height)
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .frame(maxWidth: .infinity)
                     .disabled(isProcessing)
+                    }
+
+                    if selectedResizeMode == .customPercent {
+                        resizeEntryRow(label: "Custom scale", text: $customPercentText, suffix: "%")
+                    } else if selectedResizeMode == .width {
+                        resizeEntryRow(label: "Target width", text: $widthText, suffix: "px")
+                    } else if selectedResizeMode == .height {
+                        resizeEntryRow(label: "Target height", text: $heightText, suffix: "px")
+                    }
                 }
                 
                 // DPI picker
@@ -301,10 +392,10 @@ struct ProgressView: View {
                 Button {
                     startProcessing()
                 } label: {
-                    Text(isProcessing ? "Processing…" : "Start Processing")
+                    Label(isProcessing ? "Processing..." : "Start Processing", systemImage: "sparkles")
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(files.isEmpty || (selectedFormat == nil && selectedResize == nil && selectedDPI == nil) || isProcessing)
+                .disabled(files.isEmpty || (selectedFormat == nil && selectedResize == nil && selectedDPI == nil) || !resizeInputIsValid || isProcessing)
             }
         }
     }
@@ -359,7 +450,7 @@ struct ProgressView: View {
         processFiles(urls: urls, format: selectedFormat, resize: selectedResize, dpi: selectedDPI)
     }
     
-    private func processFiles(urls: [URL], format: ImageFormat?, resize: Int?, dpi: Int?) {
+    private func processFiles(urls: [URL], format: ImageFormat?, resize: ResizeOperation?, dpi: Int?) {
         // For now, we'll process them sequentially
         // Format conversion first, then resize, then DPI
         
@@ -370,7 +461,7 @@ struct ProgressView: View {
                 if let resize = resize {
                     // Continue with resize on the converted files
                     let nextURLs = result.succeeded
-                    self.processResize(urls: nextURLs, percent: resize, dpi: dpi)
+                    self.processResize(urls: nextURLs, resize: resize, dpi: dpi)
                 } else if let dpi = dpi {
                     // Continue with DPI on the converted files
                     let nextURLs = result.succeeded
@@ -381,14 +472,14 @@ struct ProgressView: View {
                 }
             }
         } else if let resize = resize {
-            processResize(urls: urls, percent: resize, dpi: dpi)
+            processResize(urls: urls, resize: resize, dpi: dpi)
         } else if let dpi = dpi {
             processDPI(urls: urls, dpi: dpi)
         }
     }
     
-    private func processResize(urls: [URL], percent: Int, dpi: Int?) {
-        ImageProcessor.shared.resize(urls, byPercent: Double(percent)) { done, total in
+    private func processResize(urls: [URL], resize: ResizeOperation, dpi: Int?) {
+        ImageProcessor.shared.resize(urls, operation: resize) { done, total in
             currentProgress = done
         } onComplete: { result in
             if let dpi = dpi {
@@ -436,9 +527,50 @@ struct ProgressView: View {
         // Clear files
         files.removeAll()
         selectedFormat = nil
-        selectedResize = nil
+        selectedResizeMode = .none
         selectedDPI = nil
         currentProgress = 0
+    }
+
+    private func resizeEntryRow(label: String, text: Binding<String>, suffix: String) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(ProgressDesign.onSurfaceVariant)
+                .frame(width: 96, alignment: .leading)
+
+            TextField("Value", text: text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(ProgressDesign.onSurface)
+                .frame(width: 86)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(ProgressDesign.surface, in: RoundedRectangle(cornerRadius: ProgressDesign.rInner, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: ProgressDesign.rInner, style: .continuous)
+                        .strokeBorder(resizeInputIsValid ? ProgressDesign.outlineVariant.opacity(0.2) : Color.red.opacity(0.55), lineWidth: 1)
+                }
+                .onChange(of: text.wrappedValue) { newValue in
+                    text.wrappedValue = digitsOnly(newValue)
+                }
+
+            Text(suffix)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(ProgressDesign.onSurfaceVariant)
+
+            Spacer()
+        }
+        .padding(.leading, 68)
+    }
+
+    private func digitsOnly(_ value: String) -> String {
+        String(value.filter(\.isNumber).prefix(5))
+    }
+
+    private func positiveInt(_ value: String) -> Int? {
+        guard let int = Int(value), int > 0 else { return nil }
+        return int
     }
 }
 
@@ -529,11 +661,7 @@ struct FileItemRow: View {
             Spacer()
         }
         .padding(10)
-        .background(ProgressDesign.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(ProgressDesign.outlineVariant.opacity(0.1), lineWidth: 1)
-        }
+        .modifier(RowBackgroundModifier())
     }
 }
 
@@ -541,15 +669,15 @@ struct FileItemRow: View {
 
 enum Operation {
     case convert(ImageFormat)
-    case resize(Int)
+    case resize(ResizeOperation)
     case dpi(Int)
     
     var displayName: String {
         switch self {
         case .convert(let format):
             return "Convert to \(format.displayName)"
-        case .resize(let percent):
-            return "Resize to \(percent)%"
+        case .resize(let resize):
+            return resize.displayName
         case .dpi(let dpi):
             return "Set DPI to \(dpi)"
         }
@@ -565,12 +693,47 @@ private struct CardView<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) { content() }
             .padding(22)
-            .background(ProgressDesign.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(ProgressDesign.outlineVariant.opacity(0.15), lineWidth: 1)
-            )
-            .shadow(color: ProgressDesign.onSurface.opacity(0.05), radius: 30, x: 0, y: 8)
+            .modifier(CardBackgroundModifier())
+    }
+}
+
+private struct CardBackgroundModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(macOS 26.0, *) {
+            content
+                .background(ProgressDesign.chrome, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .glassEffect(.regular.tint(ProgressDesign.chrome.opacity(0.34)), in: .rect(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(ProgressDesign.outlineVariant.opacity(0.18), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.12), radius: 28, x: 0, y: 14)
+        } else {
+            content
+                .background(ProgressDesign.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(ProgressDesign.outlineVariant.opacity(0.15), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.08), radius: 26, x: 0, y: 12)
+        }
+    }
+}
+
+private extension View {
+    func pfCardBackground() -> some View {
+        modifier(CardBackgroundModifier())
+    }
+}
+
+private struct RowBackgroundModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(ProgressDesign.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(ProgressDesign.outlineVariant.opacity(0.1), lineWidth: 1)
+            }
     }
 }
 
@@ -621,15 +784,20 @@ private struct ProgressIndicatorView: View {
 }
 
 private struct PrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(ProgressDesign.primaryGradient, in: Capsule(style: .continuous))
-            .shadow(color: ProgressDesign.primary.opacity(0.25), radius: 14, x: 0, y: 6)
-            .opacity(configuration.isPressed ? 0.85 : 1)
+            .background(ProgressDesign.primaryGradient,
+                        in: RoundedRectangle(cornerRadius: ProgressDesign.rInner, style: .continuous))
+            .shadow(color: ProgressDesign.primary.opacity(isEnabled ? 0.22 : 0), radius: 10, x: 0, y: 5)
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+            .opacity(isEnabled ? 1 : 0.38)
+            .animation(.easeInOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -640,7 +808,12 @@ private struct SecondaryButtonStyle: ButtonStyle {
             .foregroundStyle(ProgressDesign.onSurface)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(ProgressDesign.surfaceHigh, in: Capsule(style: .continuous))
+            .background(ProgressDesign.surfaceHigh,
+                        in: RoundedRectangle(cornerRadius: ProgressDesign.rInner, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: ProgressDesign.rInner, style: .continuous)
+                    .strokeBorder(ProgressDesign.outlineVariant.opacity(0.16), lineWidth: 1)
+            }
             .opacity(configuration.isPressed ? 0.85 : 1)
     }
 }
@@ -660,4 +833,3 @@ private struct SecondaryButtonStyle: ButtonStyle {
     ])
     .frame(width: 520, height: 640)
 }
-

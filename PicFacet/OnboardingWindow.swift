@@ -43,7 +43,6 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Welcome to PicFacet")
                     .font(.system(size: 28, weight: .semibold))
-                    .tracking(-0.5)
                     .foregroundStyle(PFDesign.onSurface)
                 Text("Right-click image actions, the easy way.")
                     .font(.system(size: 13))

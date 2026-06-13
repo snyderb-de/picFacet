@@ -1,6 +1,23 @@
 import Foundation
 import CoreGraphics
 
+public enum ResizeOperation: Hashable {
+    case percent(Int)
+    case width(Int)
+    case height(Int)
+
+    public var displayName: String {
+        switch self {
+        case .percent(let percent):
+            return "Resize to \(percent)%"
+        case .width(let width):
+            return "Set width to \(width) px"
+        case .height(let height):
+            return "Set height to \(height) px"
+        }
+    }
+}
+
 struct ResizeEngine {
 
     // MARK: - Resize
