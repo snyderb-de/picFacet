@@ -58,37 +58,44 @@ final class ChooserWindowController {
             }
         }
 
-        func runResize(_ input: [URL]) {
+        func runResize(_ input: [URL], previousFailures: [(url: URL, error: Error)]) {
             guard let resize = selection.resize else {
-                runDPI(input)
+                runDPI(input, previousFailures: previousFailures)
                 return
             }
             ImageProcessor.shared.resize(input, operation: resize, onProgress: progress) { result in
-                if result.hasErrors || selection.dpi == nil {
-                    complete(result)
+                let failures = previousFailures + result.failed
+                if selection.dpi == nil {
+                    complete(ProcessingResult(succeeded: result.succeeded, failed: failures))
                 } else {
-                    runDPI(result.succeeded)
+                    runDPI(result.succeeded, previousFailures: failures)
                 }
             }
         }
 
-        func runDPI(_ input: [URL]) {
+        func runDPI(_ input: [URL], previousFailures: [(url: URL, error: Error)]) {
             guard let dpi = selection.dpi else {
+                complete(ProcessingResult(succeeded: input, failed: previousFailures))
                 return
             }
-            ImageProcessor.shared.changeDPI(input, to: dpi, onProgress: progress, onComplete: complete)
+            ImageProcessor.shared.changeDPI(input, to: dpi, onProgress: progress) { result in
+                complete(ProcessingResult(
+                    succeeded: result.succeeded,
+                    failed: previousFailures + result.failed
+                ))
+            }
         }
 
         if let format = selection.format {
             ImageProcessor.shared.convert(urls, to: format, onProgress: progress) { result in
-                if result.hasErrors || (selection.resize == nil && selection.dpi == nil) {
+                if selection.resize == nil && selection.dpi == nil {
                     complete(result)
                 } else {
-                    runResize(result.succeeded)
+                    runResize(result.succeeded, previousFailures: result.failed)
                 }
             }
         } else {
-            runResize(urls)
+            runResize(urls, previousFailures: [])
         }
     }
 }
@@ -120,15 +127,26 @@ struct ChooserView: View {
     let onCancel: () -> Void
     let onPick: (ChooserSelection) -> Void
 
-    @State private var selectedFormat: ImageFormat? = nil
+    @State private var selectedFormat: ImageFormat?
     @State private var selectedResizeMode: ResizeMode = .none
     @State private var customPercentText = ""
     @State private var widthText = ""
     @State private var heightText = ""
-    @State private var selectedDPI: Int? = nil
+    @State private var selectedDPI: Int?
     @State private var thumbnails: [URL: NSImage] = [:]
 
     private let percents = [25, 50, 75]
+
+    init(urls: [URL], onCancel: @escaping () -> Void, onPick: @escaping (ChooserSelection) -> Void) {
+        self.urls = urls
+        self.onCancel = onCancel
+        self.onPick = onPick
+
+        let settings = PicFacetSettings.shared
+        _selectedFormat = State(initialValue: settings.defaultFormat)
+        _selectedResizeMode = State(initialValue: .percent(Self.validDefaultResize(settings.defaultResizePercent)))
+        _selectedDPI = State(initialValue: settings.defaultDPI)
+    }
 
     var fileCount: Int { urls.count }
 
@@ -215,7 +233,14 @@ struct ChooserView: View {
             }
         }
         .padding(30)
-        .frame(width: 980, height: 700)
+        .frame(
+            minWidth: 900,
+            idealWidth: 980,
+            maxWidth: .infinity,
+            minHeight: 640,
+            idealHeight: 700,
+            maxHeight: .infinity
+        )
         .background {
             ZStack {
                 PFDesign.canvas
@@ -249,7 +274,7 @@ struct ChooserView: View {
                     actionBar
                 }
                 .padding(22)
-                .pfPanel(interactive: true)
+                .pfPanel()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
@@ -293,7 +318,7 @@ struct ChooserView: View {
             .frame(maxHeight: .infinity)
         }
         .padding(18)
-        .pfPanel(interactive: true)
+        .pfPanel()
     }
 
     private var heroPreview: some View {
@@ -551,7 +576,7 @@ struct ChooserView: View {
     private var actionBar: some View {
         HStack(spacing: 12) {
             Button("Cancel", action: onCancel)
-                .buttonStyle(PFSecondaryButtonStyle())
+                .pfSecondaryActionStyle()
 
             Button {
                 onPick(ChooserSelection(
@@ -562,7 +587,7 @@ struct ChooserView: View {
             } label: {
                 Label("Start Processing", systemImage: "sparkles")
             }
-            .buttonStyle(PFPrimaryButtonStyle())
+            .pfPrimaryActionStyle()
             .disabled(!canStart)
         }
         .padding(.top, 4)
@@ -606,6 +631,10 @@ struct ChooserView: View {
     private func positiveInt(_ value: String) -> Int? {
         guard let int = Int(value), int > 0 else { return nil }
         return int
+    }
+
+    private static func validDefaultResize(_ value: Int) -> Int {
+        [25, 50, 75].contains(value) ? value : 50
     }
 
     private func formatIcon(for format: ImageFormat) -> String {

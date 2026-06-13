@@ -10,7 +10,7 @@ enum PFDesign {
     static let surfaceLow       = Color.adaptive(light: 0xECEFF3, dark: 0x1B2026)
     static let surfaceLowest    = Color.adaptive(light: 0xFFFFFF, dark: 0x242A32)
     static let surfaceHigh      = Color.adaptive(light: 0xDDE3EA, dark: 0x303842)
-    static let chrome           = Color.adaptive(light: 0xFBFCFE, dark: 0x181D23, alpha: 0.86)
+    static let chrome           = Color.adaptive(light: 0xFBFCFE, dark: 0x181D23, alpha: 0.56)
 
     // MARK: Ink
     static let onSurface        = Color.adaptive(light: 0x161A1F, dark: 0xF5F7FA)
@@ -85,8 +85,7 @@ struct PFPanelBackground: ViewModifier {
         if #available(macOS 26.0, *) {
             if interactive {
                 content
-                    .background(PFDesign.chrome, in: RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous))
-                    .glassEffect(.regular.tint(PFDesign.chrome.opacity(0.34)).interactive(), in: .rect(cornerRadius: PFDesign.rCard))
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: PFDesign.rCard))
                     .overlay(
                         RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous)
                             .strokeBorder(PFDesign.outlineVariant.opacity(0.18), lineWidth: 1)
@@ -94,8 +93,7 @@ struct PFPanelBackground: ViewModifier {
                     .shadow(color: Color.black.opacity(0.12), radius: 28, x: 0, y: 14)
             } else {
                 content
-                    .background(PFDesign.chrome, in: RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous))
-                    .glassEffect(.regular.tint(PFDesign.chrome.opacity(0.34)), in: .rect(cornerRadius: PFDesign.rCard))
+                    .glassEffect(.regular, in: .rect(cornerRadius: PFDesign.rCard))
                     .overlay(
                         RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous)
                             .strokeBorder(PFDesign.outlineVariant.opacity(0.18), lineWidth: 1)
@@ -144,15 +142,42 @@ struct PFChip: View {
     @State private var pressing = false
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                if let systemImage {
-                    Image(systemName: systemImage)
-                        .font(.system(size: 11, weight: .semibold))
+        if #available(macOS 26.0, *) {
+            if isSelected {
+                Button(action: action) {
+                    chipLabel
                 }
-                Text(title)
-                    .font(.system(size: 12, weight: .semibold))
+                .buttonStyle(.glassProminent)
+                .controlSize(.small)
+                .tint(PFDesign.primary)
+            } else {
+                Button(action: action) {
+                    chipLabel
+                }
+                .buttonStyle(.glass)
+                .controlSize(.small)
             }
+        } else {
+            fallbackChip
+        }
+    }
+
+    private var chipLabel: some View {
+        HStack(spacing: 6) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+        }
+        .padding(.horizontal, 3)
+        .padding(.vertical, 1)
+    }
+
+    private var fallbackChip: some View {
+        Button(action: action) {
+            chipLabel
             .padding(.horizontal, 13)
             .padding(.vertical, 8)
             .foregroundStyle(isSelected ? .white : PFDesign.onSurface)
@@ -170,6 +195,32 @@ struct PFChip: View {
                 .onEnded { _ in pressing = false }
         )
         .onHover { hovering = $0 }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func pfPrimaryActionStyle() -> some View {
+        if #available(macOS 26.0, *) {
+            self
+                .frame(maxWidth: .infinity)
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .tint(PFDesign.primary)
+        } else {
+            self.buttonStyle(PFPrimaryButtonStyle())
+        }
+    }
+
+    @ViewBuilder
+    func pfSecondaryActionStyle() -> some View {
+        if #available(macOS 26.0, *) {
+            self
+                .buttonStyle(.glass)
+                .controlSize(.regular)
+        } else {
+            self.buttonStyle(PFSecondaryButtonStyle())
+        }
     }
 }
 

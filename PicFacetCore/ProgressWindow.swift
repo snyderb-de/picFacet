@@ -52,7 +52,7 @@ private enum ProgressDesign {
     static let surface = Color.adaptive(light: 0xFFFFFF, dark: 0x242A32)
     static let surfaceLow = Color.adaptive(light: 0xECEFF3, dark: 0x1B2026)
     static let surfaceHigh = Color.adaptive(light: 0xDDE3EA, dark: 0x303842)
-    static let chrome = Color.adaptive(light: 0xFBFCFE, dark: 0x181D23, alpha: 0.86)
+    static let chrome = Color.adaptive(light: 0xFBFCFE, dark: 0x181D23, alpha: 0.56)
     
     static let onSurface = Color.adaptive(light: 0x161A1F, dark: 0xF5F7FA)
     static let onSurfaceVariant = Color.adaptive(light: 0x5D6673, dark: 0xB7C0CC)
@@ -108,12 +108,12 @@ struct ProgressView: View {
     @State private var isDraggingOver = false
     
     // Multiple operation settings
-    @State private var selectedFormat: ImageFormat? = nil
+    @State private var selectedFormat: ImageFormat?
     @State private var selectedResizeMode: BatchResizeMode = .none
     @State private var customPercentText = ""
     @State private var widthText = ""
     @State private var heightText = ""
-    @State private var selectedDPI: Int? = nil
+    @State private var selectedDPI: Int?
 
     private var selectedResize: ResizeOperation? {
         switch selectedResizeMode {
@@ -144,26 +144,32 @@ struct ProgressView: View {
     
     init(initialFiles: [URL]) {
         _files = State(initialValue: initialFiles.map { FileItem(url: $0) })
+
+        let settings = PicFacetSettings.shared
+        _selectedFormat = State(initialValue: settings.defaultFormat)
+        _selectedResizeMode = State(initialValue: .percent(Self.validDefaultResize(settings.defaultResizePercent)))
+        _selectedDPI = State(initialValue: settings.defaultDPI)
     }
     
     var body: some View {
-        HStack(alignment: .top, spacing: 22) {
-            VStack(spacing: 18) {
-                headerView
-
-                if files.isEmpty {
-                    dropZoneView
-                } else {
-                    fileListView
+        Group {
+            if #available(macOS 26.0, *) {
+                GlassEffectContainer(spacing: 22) {
+                    rootContent
                 }
+            } else {
+                rootContent
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            controlsView
-                .frame(width: 310)
         }
         .padding(30)
-        .frame(width: 880, height: 680)
+        .frame(
+            minWidth: 780,
+            idealWidth: 880,
+            maxWidth: .infinity,
+            minHeight: 600,
+            idealHeight: 680,
+            maxHeight: .infinity
+        )
         .background {
             ZStack {
                 ProgressDesign.canvas
@@ -180,6 +186,24 @@ struct ProgressView: View {
         }
         .onDrop(of: [.fileURL], isTargeted: $isDraggingOver) { providers in
             handleDrop(providers: providers)
+        }
+    }
+
+    private var rootContent: some View {
+        HStack(alignment: .top, spacing: 22) {
+            VStack(spacing: 18) {
+                headerView
+
+                if files.isEmpty {
+                    dropZoneView
+                } else {
+                    fileListView
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            controlsView
+                .frame(width: 310)
         }
     }
     
@@ -238,7 +262,7 @@ struct ProgressView: View {
             Button("Select Files...") {
                 selectFiles()
             }
-            .buttonStyle(SecondaryButtonStyle())
+            .progressSecondaryActionStyle()
             .padding(.top, 8)
             
             Spacer()
@@ -273,9 +297,7 @@ struct ProgressView: View {
                 Spacer()
                 Button {
                     files.removeAll()
-                    selectedFormat = nil
-                    selectedResizeMode = .none
-                    selectedDPI = nil
+                    resetOperationDefaults()
                     isProcessing = false
                 } label: {
                     Text("Clear")
@@ -394,7 +416,7 @@ struct ProgressView: View {
                 } label: {
                     Label(isProcessing ? "Processing..." : "Start Processing", systemImage: "sparkles")
                 }
-                .buttonStyle(PrimaryButtonStyle())
+                .progressPrimaryActionStyle()
                 .disabled(files.isEmpty || (selectedFormat == nil && selectedResize == nil && selectedDPI == nil) || !resizeInputIsValid || isProcessing)
             }
         }
@@ -460,45 +482,66 @@ struct ProgressView: View {
             } onComplete: { result in
                 if let resize = resize {
                     // Continue with resize on the converted files
-                    let nextURLs = result.succeeded
-                    self.processResize(urls: nextURLs, resize: resize, dpi: dpi)
+                    self.processResize(
+                        urls: result.succeeded,
+                        resize: resize,
+                        dpi: dpi,
+                        previousFailures: result.failed
+                    )
                 } else if let dpi = dpi {
-                    // Continue with DPI on the converted files
-                    let nextURLs = result.succeeded
-                    self.processDPI(urls: nextURLs, dpi: dpi)
+                    self.processDPI(
+                        urls: result.succeeded,
+                        dpi: dpi,
+                        previousFailures: result.failed
+                    )
                 } else {
                     // Done!
                     self.handleCompletion(result)
                 }
             }
         } else if let resize = resize {
-            processResize(urls: urls, resize: resize, dpi: dpi)
+            processResize(urls: urls, resize: resize, dpi: dpi, previousFailures: [])
         } else if let dpi = dpi {
-            processDPI(urls: urls, dpi: dpi)
+            processDPI(urls: urls, dpi: dpi, previousFailures: [])
         }
     }
     
-    private func processResize(urls: [URL], resize: ResizeOperation, dpi: Int?) {
+    private func processResize(
+        urls: [URL],
+        resize: ResizeOperation,
+        dpi: Int?,
+        previousFailures: [(url: URL, error: Error)]
+    ) {
         ImageProcessor.shared.resize(urls, operation: resize) { done, total in
             currentProgress = done
         } onComplete: { result in
             if let dpi = dpi {
-                // Continue with DPI
-                let nextURLs = result.succeeded
-                self.processDPI(urls: nextURLs, dpi: dpi)
+                self.processDPI(
+                    urls: result.succeeded,
+                    dpi: dpi,
+                    previousFailures: previousFailures + result.failed
+                )
             } else {
-                // Done!
-                self.handleCompletion(result)
+                self.handleCompletion(ProcessingResult(
+                    succeeded: result.succeeded,
+                    failed: previousFailures + result.failed
+                ))
             }
         }
     }
     
-    private func processDPI(urls: [URL], dpi: Int) {
+    private func processDPI(
+        urls: [URL],
+        dpi: Int,
+        previousFailures: [(url: URL, error: Error)]
+    ) {
         ImageProcessor.shared.changeDPI(urls, to: dpi) { done, total in
             currentProgress = done
         } onComplete: { result in
-            // Done!
-            self.handleCompletion(result)
+            self.handleCompletion(ProcessingResult(
+                succeeded: result.succeeded,
+                failed: previousFailures + result.failed
+            ))
         }
     }
     
@@ -526,9 +569,7 @@ struct ProgressView: View {
         
         // Clear files
         files.removeAll()
-        selectedFormat = nil
-        selectedResizeMode = .none
-        selectedDPI = nil
+        resetOperationDefaults()
         currentProgress = 0
     }
 
@@ -571,6 +612,20 @@ struct ProgressView: View {
     private func positiveInt(_ value: String) -> Int? {
         guard let int = Int(value), int > 0 else { return nil }
         return int
+    }
+
+    private func resetOperationDefaults() {
+        let settings = PicFacetSettings.shared
+        selectedFormat = settings.defaultFormat
+        selectedResizeMode = .percent(Self.validDefaultResize(settings.defaultResizePercent))
+        selectedDPI = settings.defaultDPI
+        customPercentText = ""
+        widthText = ""
+        heightText = ""
+    }
+
+    private static func validDefaultResize(_ value: Int) -> Int {
+        [25, 50, 75].contains(value) ? value : 50
     }
 }
 
@@ -701,8 +756,7 @@ private struct CardBackgroundModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
             content
-                .background(ProgressDesign.chrome, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .glassEffect(.regular.tint(ProgressDesign.chrome.opacity(0.34)), in: .rect(cornerRadius: 8))
+                .glassEffect(.regular, in: .rect(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(ProgressDesign.outlineVariant.opacity(0.18), lineWidth: 1)
@@ -723,6 +777,30 @@ private struct CardBackgroundModifier: ViewModifier {
 private extension View {
     func pfCardBackground() -> some View {
         modifier(CardBackgroundModifier())
+    }
+
+    @ViewBuilder
+    func progressPrimaryActionStyle() -> some View {
+        if #available(macOS 26.0, *) {
+            self
+                .frame(maxWidth: .infinity)
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .tint(ProgressDesign.primary)
+        } else {
+            self.buttonStyle(PrimaryButtonStyle())
+        }
+    }
+
+    @ViewBuilder
+    func progressSecondaryActionStyle() -> some View {
+        if #available(macOS 26.0, *) {
+            self
+                .buttonStyle(.glass)
+                .controlSize(.regular)
+        } else {
+            self.buttonStyle(SecondaryButtonStyle())
+        }
     }
 }
 

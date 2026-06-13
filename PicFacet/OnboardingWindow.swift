@@ -73,10 +73,10 @@ Tip: enable **PicFacet…** to get the full picker (every format, every preset) 
                         NSWorkspace.shared.open(url)
                     }
                 }
-                .buttonStyle(PFSecondaryButtonStyle())
+                .pfSecondaryActionStyle()
 
                 Button("Got it", action: onClose)
-                    .buttonStyle(PFPrimaryButtonStyle())
+                    .pfPrimaryActionStyle()
                     .keyboardShortcut(.defaultAction)
             }
         }
