@@ -44,62 +44,16 @@ final class BatchWindowController {
 
 // MARK: - SwiftUI View
 
-private enum BatchResizeMode: Hashable {
-    case none
-    case percent(Int)
-    case customPercent
-    case width
-    case height
-}
-
 struct BatchView: View {
     @State private var files: [FileItem]
     @State private var isProcessing = false
     @State private var currentProgress = 0
     @State private var isDraggingOver = false
     
-    // Multiple operation settings
-    @State private var selectedFormat: ImageFormat?
-    @State private var selectedResizeMode: BatchResizeMode = .none
-    @State private var customPercentText = ""
-    @State private var widthText = ""
-    @State private var heightText = ""
-    @State private var selectedDPI: Int?
+    @State private var draft = OperationDraft.defaults()
 
-    private var selectedResize: ResizeOperation? {
-        switch selectedResizeMode {
-        case .none:
-            return nil
-        case .percent(let percent):
-            return .percent(percent)
-        case .customPercent:
-            guard let value = positiveInt(customPercentText) else { return nil }
-            return .percent(value)
-        case .width:
-            guard let value = positiveInt(widthText) else { return nil }
-            return .width(value)
-        case .height:
-            guard let value = positiveInt(heightText) else { return nil }
-            return .height(value)
-        }
-    }
-
-    private var resizeInputIsValid: Bool {
-        switch selectedResizeMode {
-        case .none, .percent:
-            return true
-        case .customPercent, .width, .height:
-            return selectedResize != nil
-        }
-    }
-    
     init(initialFiles: [URL]) {
         _files = State(initialValue: initialFiles.map { FileItem(url: $0) })
-
-        let settings = PicFacetSettings.shared
-        _selectedFormat = State(initialValue: settings.defaultFormat)
-        _selectedResizeMode = State(initialValue: .percent(Self.validDefaultResize(settings.defaultResizePercent)))
-        _selectedDPI = State(initialValue: settings.defaultDPI)
     }
     
     var body: some View {
@@ -242,7 +196,7 @@ struct BatchView: View {
                 Spacer()
                 Button {
                     files.removeAll()
-                    resetOperationDefaults()
+                    draft = .defaults()
                     isProcessing = false
                 } label: {
                     Text("Clear")
@@ -292,7 +246,7 @@ struct BatchView: View {
                         .foregroundStyle(PFDesign.onSurfaceVariant)
                         .frame(width: 60, alignment: .leading)
                     
-                    Picker("", selection: $selectedFormat) {
+                    Picker("", selection: $draft.format) {
                         Text("Leave as-is").tag(nil as ImageFormat?)
                         ForEach(ImageFormat.allCases, id: \.self) { format in
                             Text(format.displayName).tag(Optional(format))
@@ -312,14 +266,10 @@ struct BatchView: View {
                         .foregroundStyle(PFDesign.onSurfaceVariant)
                         .frame(width: 60, alignment: .leading)
                     
-                    Picker("", selection: $selectedResizeMode) {
-                        Text("Leave as-is").tag(BatchResizeMode.none)
-                        Text("25%").tag(BatchResizeMode.percent(25))
-                        Text("50%").tag(BatchResizeMode.percent(50))
-                        Text("75%").tag(BatchResizeMode.percent(75))
-                        Text("Custom %").tag(BatchResizeMode.customPercent)
-                        Text("Set width").tag(BatchResizeMode.width)
-                        Text("Set height").tag(BatchResizeMode.height)
+                    Picker("", selection: $draft.resizeMode) {
+                        ForEach(ResizeMode.allCases, id: \.self) { mode in
+                            Text(mode.title).tag(mode)
+                        }
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
@@ -327,13 +277,8 @@ struct BatchView: View {
                     .disabled(isProcessing)
                     }
 
-                    if selectedResizeMode == .customPercent {
-                        resizeEntryRow(label: "Custom scale", text: $customPercentText, suffix: "%")
-                    } else if selectedResizeMode == .width {
-                        resizeEntryRow(label: "Target width", text: $widthText, suffix: "px")
-                    } else if selectedResizeMode == .height {
-                        resizeEntryRow(label: "Target height", text: $heightText, suffix: "px")
-                    }
+                    ResizeEntryRow(draft: $draft, labelWidth: 96)
+                        .padding(.leading, 68)
                 }
                 
                 // DPI picker
@@ -343,7 +288,7 @@ struct BatchView: View {
                         .foregroundStyle(PFDesign.onSurfaceVariant)
                         .frame(width: 60, alignment: .leading)
                     
-                    Picker("", selection: $selectedDPI) {
+                    Picker("", selection: $draft.dpi) {
                         Text("Leave as-is").tag(nil as Int?)
                         ForEach(PicFacetSettings.dpiOptions, id: \.self) { dpi in
                             Text("\(dpi) DPI").tag(Optional(dpi))
@@ -362,7 +307,7 @@ struct BatchView: View {
                     Label(isProcessing ? "Processing..." : "Start Processing", systemImage: "sparkles")
                 }
                 .pfPrimaryActionStyle()
-                .disabled(files.isEmpty || (selectedFormat == nil && selectedResize == nil && selectedDPI == nil) || !resizeInputIsValid || isProcessing)
+                .disabled(files.isEmpty || draft.selection == nil || isProcessing)
             }
         }
     }
@@ -401,98 +346,25 @@ struct BatchView: View {
         isProcessing = true
         currentProgress = 0
 
+        guard let selection = draft.selection else { return }
+        let summary = draft.summary
         let urls = files.map { $0.url }
-        let selection = BatchSelection(format: selectedFormat, resize: selectedResize, dpi: selectedDPI)
 
         Task {
             let result = await ImageProcessor.process(urls, selection) { done, _ in
                 currentProgress = done
             }
-            handleCompletion(result)
+            handleCompletion(result, summary: summary)
         }
     }
 
-    private func handleCompletion(_ result: ProcessingResult) {
+    private func handleCompletion(_ result: ProcessingResult, summary: String) {
         isProcessing = false
-        
-        // Show completion alert
-        let alert = NSAlert()
-        alert.messageText = "Processing Complete"
-        
-        var operations: [String] = []
-        if selectedFormat != nil { operations.append("converted") }
-        if selectedResize != nil { operations.append("resized") }
-        if selectedDPI != nil { operations.append("DPI changed") }
-        
-        let operationsText = operations.joined(separator: ", ")
-        alert.informativeText = "Successfully \(operationsText) \(result.succeeded.count) file(s)."
-        
-        if result.hasErrors {
-            alert.informativeText += "\n\(result.failed.count) file(s) failed."
-        }
-        alert.alertStyle = result.hasErrors ? .warning : .informational
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-        
-        // Clear files
+        CompletionAlert.show(result, summary: summary)
+
         files.removeAll()
-        resetOperationDefaults()
+        draft = .defaults()
         currentProgress = 0
-    }
-
-    private func resizeEntryRow(label: String, text: Binding<String>, suffix: String) -> some View {
-        HStack(spacing: 8) {
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(PFDesign.onSurfaceVariant)
-                .frame(width: 96, alignment: .leading)
-
-            TextField("Value", text: text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(PFDesign.onSurface)
-                .frame(width: 86)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(PFDesign.surfaceLowest, in: RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
-                        .strokeBorder(resizeInputIsValid ? PFDesign.outlineVariant.opacity(0.2) : Color.red.opacity(0.55), lineWidth: 1)
-                }
-                .onChange(of: text.wrappedValue) { _, newValue in
-                    text.wrappedValue = digitsOnly(newValue)
-                }
-
-            Text(suffix)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(PFDesign.onSurfaceVariant)
-
-            Spacer()
-        }
-        .padding(.leading, 68)
-    }
-
-    private func digitsOnly(_ value: String) -> String {
-        String(value.filter(\.isNumber).prefix(5))
-    }
-
-    private func positiveInt(_ value: String) -> Int? {
-        guard let int = Int(value), int > 0 else { return nil }
-        return int
-    }
-
-    private func resetOperationDefaults() {
-        let settings = PicFacetSettings.shared
-        selectedFormat = settings.defaultFormat
-        selectedResizeMode = .percent(Self.validDefaultResize(settings.defaultResizePercent))
-        selectedDPI = settings.defaultDPI
-        customPercentText = ""
-        widthText = ""
-        heightText = ""
-    }
-
-    private static func validDefaultResize(_ value: Int) -> Int {
-        [25, 50, 75].contains(value) ? value : 50
     }
 }
 
@@ -501,51 +373,18 @@ struct BatchView: View {
 struct FileItem: Identifiable {
     let id = UUID()
     let url: URL
-    var thumbnail: NSImage?
-    
-    init(url: URL) {
-        self.url = url
-        self.thumbnail = Self.loadThumbnail(for: url)
-    }
-    
-    private static func loadThumbnail(for url: URL) -> NSImage? {
-        guard let image = NSImage(contentsOf: url) else { return nil }
-        
-        let size = NSSize(width: 40, height: 40)
-        let thumbnail = NSImage(size: size)
-        thumbnail.lockFocus()
-        
-        let aspectRatio = image.size.width / image.size.height
-        var drawRect = NSRect(origin: .zero, size: size)
-        
-        if aspectRatio > 1 {
-            // Landscape
-            let newHeight = size.width / aspectRatio
-            drawRect.origin.y = (size.height - newHeight) / 2
-            drawRect.size.height = newHeight
-        } else {
-            // Portrait
-            let newWidth = size.height * aspectRatio
-            drawRect.origin.x = (size.width - newWidth) / 2
-            drawRect.size.width = newWidth
-        }
-        
-        image.draw(in: drawRect)
-        thumbnail.unlockFocus()
-        
-        return thumbnail
-    }
 }
 
 // MARK: - File Item Row
 
 struct FileItemRow: View {
     let item: FileItem
+    @State private var thumbnail: NSImage?
     
     var body: some View {
         HStack(spacing: 12) {
             // Thumbnail
-            if let thumbnail = item.thumbnail {
+            if let thumbnail {
                 Image(nsImage: thumbnail)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -584,6 +423,9 @@ struct FileItemRow: View {
         }
         .padding(10)
         .modifier(RowBackgroundModifier())
+        .task(id: item.url) {
+            thumbnail = await Thumbnail.load(item.url, maxPixelSize: 80)
+        }
     }
 }
 

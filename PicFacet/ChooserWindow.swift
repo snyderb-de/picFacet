@@ -11,8 +11,8 @@ final class ChooserWindowController {
     func show(urls: [URL]) {
         let root = ChooserView(urls: urls, onCancel: { [weak self] in
             self?.close()
-        }) { [weak self] selection in
-            self?.run(selection: selection, urls: urls)
+        }) { [weak self] draft in
+            self?.run(draft: draft, urls: urls)
             self?.close()
         }
         if window == nil {
@@ -38,36 +38,17 @@ final class ChooserWindowController {
 
     private func close() { window?.orderOut(nil) }
 
-    private func run(selection: BatchSelection, urls: [URL]) {
-        guard selection.hasSelection else { return }
+    private func run(draft: OperationDraft, urls: [URL]) {
+        guard let selection = draft.selection else { return }
 
-        Task { @MainActor in
+        Task {
             let r = await ImageProcessor.process(urls, selection) { d, t in
                 NSLog("[PicFacet] %d/%d", d, t)
             }
             NSLog("[PicFacet] done ok=%d failed=%d", r.succeeded.count, r.failed.count)
-
-            let alert = NSAlert()
-            alert.messageText = "Processing Complete"
-            alert.informativeText = "Successfully processed \(r.succeeded.count) file(s)."
-            if r.hasErrors {
-                alert.informativeText += "\n\(r.failed.count) file(s) failed."
-            }
-            alert.alertStyle = r.hasErrors ? .warning : .informational
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
+            CompletionAlert.show(r, summary: draft.summary)
         }
     }
-}
-
-// MARK: - Operations
-
-private enum ResizeMode: Hashable {
-    case none
-    case percent(Int)
-    case customPercent
-    case width
-    case height
 }
 
 // MARK: - View
@@ -75,27 +56,15 @@ private enum ResizeMode: Hashable {
 struct ChooserView: View {
     let urls: [URL]
     let onCancel: () -> Void
-    let onPick: (BatchSelection) -> Void
+    let onPick: (OperationDraft) -> Void
 
-    @State private var selectedFormat: ImageFormat?
-    @State private var selectedResizeMode: ResizeMode = .none
-    @State private var customPercentText = ""
-    @State private var widthText = ""
-    @State private var heightText = ""
-    @State private var selectedDPI: Int?
+    @State private var draft = OperationDraft.defaults()
     @State private var thumbnails: [URL: NSImage] = [:]
 
-    private let percents = [25, 50, 75]
-
-    init(urls: [URL], onCancel: @escaping () -> Void, onPick: @escaping (BatchSelection) -> Void) {
+    init(urls: [URL], onCancel: @escaping () -> Void, onPick: @escaping (OperationDraft) -> Void) {
         self.urls = urls
         self.onCancel = onCancel
         self.onPick = onPick
-
-        let settings = PicFacetSettings.shared
-        _selectedFormat = State(initialValue: settings.defaultFormat)
-        _selectedResizeMode = State(initialValue: .percent(Self.validDefaultResize(settings.defaultResizePercent)))
-        _selectedDPI = State(initialValue: settings.defaultDPI)
     }
 
     var fileCount: Int { urls.count }
@@ -119,58 +88,8 @@ struct ChooserView: View {
         return ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
     }
 
-    private var resizeOperation: ResizeOperation? {
-        switch selectedResizeMode {
-        case .none:
-            return nil
-        case .percent(let percent):
-            return .percent(percent)
-        case .customPercent:
-            guard let value = positiveInt(customPercentText) else { return nil }
-            return .percent(value)
-        case .width:
-            guard let value = positiveInt(widthText) else { return nil }
-            return .width(value)
-        case .height:
-            guard let value = positiveInt(heightText) else { return nil }
-            return .height(value)
-        }
-    }
-
-    private var resizeInputIsValid: Bool {
-        switch selectedResizeMode {
-        case .none, .percent:
-            return true
-        case .customPercent, .width, .height:
-            return resizeOperation != nil
-        }
-    }
-
-    private var hasSelection: Bool {
-        selectedFormat != nil || resizeOperation != nil || selectedDPI != nil
-    }
-
-    private var canStart: Bool {
-        hasSelection && resizeInputIsValid
-    }
-
-    private var operationSummary: String {
-        if !resizeInputIsValid {
-            return "Enter a positive resize value to continue."
-        }
-
-        var parts: [String] = []
-        if let format = selectedFormat {
-            parts.append("Convert to \(format.displayName)")
-        }
-        if let resizeOperation {
-            parts.append(resizeOperation.displayName)
-        }
-        if let selectedDPI {
-            parts.append("Set \(selectedDPI) DPI")
-        }
-        return parts.isEmpty ? "Choose at least one operation to continue." : parts.joined(separator: " + ")
-    }
+    private var hasSelection: Bool { draft.format != nil || draft.resize != nil || draft.dpi != nil }
+    private var canStart: Bool { draft.selection != nil }
 
     var body: some View {
         GlassEffectContainer(spacing: 18) {
@@ -344,25 +263,9 @@ struct ChooserView: View {
     private func loadThumbnails() {
         for url in urls.prefix(12) {
             Task {
-                let cgImage = await Task.detached(priority: .userInitiated) {
-                    Self.createThumbnail(for: url)
-                }.value
-                if let cgImage {
-                    thumbnails[url] = NSImage(cgImage: cgImage, size: .zero)
-                }
+                thumbnails[url] = await Thumbnail.load(url, maxPixelSize: 840)
             }
         }
-    }
-
-    /// Decodes a downsampled thumbnail off the main actor.
-    nonisolated private static func createThumbnail(for url: URL) -> CGImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 840
-        ]
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
     // MARK: Header
@@ -409,12 +312,12 @@ struct ChooserView: View {
             VStack(alignment: .leading, spacing: 9) {
                 optionLabel("Format", detail: "Output file type")
                 FlowLayout(spacing: 8) {
-                    clearChip(title: "Leave as-is", isSelected: selectedFormat == nil) {
-                        selectedFormat = nil
+                    PFChip(title: "Leave as-is", isSelected: draft.format == nil) {
+                        draft.format = nil
                     }
                     ForEach(ImageFormat.allCases, id: \.self) { fmt in
-                        PFChip(title: fmt.displayName, isSelected: selectedFormat == fmt, systemImage: formatIcon(for: fmt)) {
-                            selectedFormat = fmt
+                        PFChip(title: fmt.displayName, isSelected: draft.format == fmt, systemImage: formatIcon(for: fmt)) {
+                            draft.format = fmt
                         }
                     }
                 }
@@ -423,43 +326,26 @@ struct ChooserView: View {
             VStack(alignment: .leading, spacing: 9) {
                 optionLabel("Resize", detail: "Scale or constrain dimensions")
                 FlowLayout(spacing: 8) {
-                    clearChip(title: "Leave as-is", isSelected: selectedResizeMode == .none) {
-                        selectedResizeMode = .none
-                    }
-                    ForEach(percents, id: \.self) { p in
-                        PFChip(title: "\(p)%", isSelected: selectedResizeMode == .percent(p), systemImage: "arrow.down.right.and.arrow.up.left") {
-                            selectedResizeMode = .percent(p)
+                    ForEach(ResizeMode.allCases, id: \.self) { mode in
+                        PFChip(title: mode.title, isSelected: draft.resizeMode == mode, systemImage: mode.systemImage) {
+                            draft.resizeMode = mode
                         }
-                    }
-                    PFChip(title: "Custom %", isSelected: selectedResizeMode == .customPercent, systemImage: "slider.horizontal.3") {
-                        selectedResizeMode = .customPercent
-                    }
-                    PFChip(title: "Set W", isSelected: selectedResizeMode == .width, systemImage: "arrow.left.and.right") {
-                        selectedResizeMode = .width
-                    }
-                    PFChip(title: "Set H", isSelected: selectedResizeMode == .height, systemImage: "arrow.up.and.down") {
-                        selectedResizeMode = .height
                     }
                 }
 
-                if selectedResizeMode == .customPercent {
-                    resizeEntryRow(label: "Custom scale", text: $customPercentText, suffix: "%")
-                } else if selectedResizeMode == .width {
-                    resizeEntryRow(label: "Target width", text: $widthText, suffix: "px")
-                } else if selectedResizeMode == .height {
-                    resizeEntryRow(label: "Target height", text: $heightText, suffix: "px")
-                }
+                ResizeEntryRow(draft: $draft)
+                    .padding(.top, 2)
             }
 
             VStack(alignment: .leading, spacing: 9) {
                 optionLabel("DPI", detail: "Print-resolution metadata")
                 FlowLayout(spacing: 8) {
-                    clearChip(title: "Leave as-is", isSelected: selectedDPI == nil) {
-                        selectedDPI = nil
+                    PFChip(title: "Leave as-is", isSelected: draft.dpi == nil) {
+                        draft.dpi = nil
                     }
                     ForEach(PicFacetSettings.dpiOptions, id: \.self) { d in
-                        PFChip(title: "\(d)", isSelected: selectedDPI == d, systemImage: dpiIcon(for: d)) {
-                            selectedDPI = d
+                        PFChip(title: "\(d)", isSelected: draft.dpi == d, systemImage: dpiIcon(for: d)) {
+                            draft.dpi = d
                         }
                     }
                 }
@@ -478,16 +364,12 @@ struct ChooserView: View {
         }
     }
 
-    private func clearChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        PFChip(title: title, isSelected: isSelected, action: action)
-    }
-
     private var summaryBar: some View {
         HStack(spacing: 10) {
             Image(systemName: canStart ? "checkmark.circle.fill" : "circle.dashed")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(canStart ? PFDesign.success : PFDesign.onSurfaceVariant)
-            Text(operationSummary)
+            Text(draft.summary)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(hasSelection ? PFDesign.onSurface : PFDesign.onSurfaceVariant)
                 .lineLimit(2)
@@ -509,11 +391,7 @@ struct ChooserView: View {
                 .pfSecondaryActionStyle()
 
             Button {
-                onPick(BatchSelection(
-                    format: selectedFormat,
-                    resize: resizeOperation,
-                    dpi: selectedDPI
-                ))
+                onPick(draft)
             } label: {
                 Label("Start Processing", systemImage: "sparkles")
             }
@@ -521,50 +399,6 @@ struct ChooserView: View {
             .disabled(!canStart)
         }
         .padding(.top, 4)
-    }
-
-    private func resizeEntryRow(label: String, text: Binding<String>, suffix: String) -> some View {
-        HStack(spacing: 8) {
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(PFDesign.onSurfaceVariant)
-
-            TextField("Value", text: text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(PFDesign.onSurface)
-                .frame(width: 86)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(PFDesign.surfaceLowest, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(resizeInputIsValid ? PFDesign.outlineVariant.opacity(0.2) : Color.red.opacity(0.55), lineWidth: 1)
-                }
-                .onChange(of: text.wrappedValue) { _, newValue in
-                    text.wrappedValue = digitsOnly(newValue)
-                }
-
-            Text(suffix)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(PFDesign.onSurfaceVariant)
-
-            Spacer()
-        }
-        .padding(.top, 2)
-    }
-
-    private func digitsOnly(_ value: String) -> String {
-        String(value.filter(\.isNumber).prefix(5))
-    }
-
-    private func positiveInt(_ value: String) -> Int? {
-        guard let int = Int(value), int > 0 else { return nil }
-        return int
-    }
-
-    private static func validDefaultResize(_ value: Int) -> Int {
-        [25, 50, 75].contains(value) ? value : 50
     }
 
     private func formatIcon(for format: ImageFormat) -> String {

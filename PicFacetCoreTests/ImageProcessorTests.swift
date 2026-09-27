@@ -134,3 +134,53 @@ import Testing
 @MainActor private final class ProgressLog {
     var values: [String] = []
 }
+
+@Suite struct OperationDraftTests {
+    @Test func emptyDraftHasNoSelection() {
+        let draft = OperationDraft()
+        #expect(draft.selection == nil)
+        #expect(draft.summary == "Choose at least one operation to continue.")
+    }
+
+    @Test func presetPercentNeedsNoEntry() {
+        let draft = OperationDraft(resizeMode: .percent(50))
+        #expect(draft.entryIsValid)
+        #expect(draft.selection == BatchSelection(resize: .percent(50)))
+    }
+
+    @Test func typedModeIsInvalidUntilPositive() {
+        var draft = OperationDraft(format: .png, resizeMode: .width)
+        #expect(!draft.entryIsValid)
+        #expect(draft.selection == nil)
+        #expect(draft.summary == "Enter a positive resize value to continue.")
+
+        draft.entryText = "0"
+        #expect(draft.selection == nil)
+
+        draft.entryText = "800"
+        #expect(draft.selection == BatchSelection(format: .png, resize: .width(800)))
+        #expect(draft.summary == "Convert to PNG + Set width to 800 px")
+    }
+
+    @Test func entryKeepsDigitsOnlyAndCaps() {
+        var draft = OperationDraft(resizeMode: .height)
+        draft.entryText = "12a3456789"
+        #expect(draft.entryText == "12345")
+    }
+
+    @Test func entriesAreKeptPerMode() {
+        var draft = OperationDraft(resizeMode: .width)
+        draft.entryText = "640"
+        draft.resizeMode = .height
+        #expect(draft.entryText == "")
+        draft.entryText = "480"
+        draft.resizeMode = .width
+        #expect(draft.resize == .width(640))
+    }
+
+    @Test func customPercentBecomesPercent() {
+        var draft = OperationDraft(resizeMode: .customPercent, dpi: 300)
+        draft.entryText = "33"
+        #expect(draft.selection == BatchSelection(resize: .percent(33), dpi: 300))
+    }
+}
