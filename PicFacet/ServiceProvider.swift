@@ -17,22 +17,20 @@ final class ServiceProvider: NSObject {
         return items.filter { $0.isImageFile }
     }
 
-    private func run(_ pboard: NSPasteboard, _ work: ([URL]) -> Void) {
+    private func run(_ pboard: NSPasteboard, _ selection: BatchSelection) {
         let urls = imageURLs(from: pboard)
         NSLog("[PicFacet] Service fired — %d image(s)", urls.count)
         guard !urls.isEmpty else { return }
-        work(urls)
-    }
-
-    private static let progress: (Int, Int) -> Void = { done, total in
-        NSLog("[PicFacet] progress %d/%d", done, total)
-    }
-    private static let complete: (ProcessingResult) -> Void = { result in
-        NSLog("[PicFacet] done — ok=%d failed=%d",
-              result.succeeded.count, result.failed.count)
-        for f in result.failed {
-            NSLog("[PicFacet] fail %@: %@",
-                  f.url.lastPathComponent, f.error.localizedDescription)
+        Task {
+            let result = await ImageProcessor.process(urls, selection) { done, total in
+                NSLog("[PicFacet] progress %d/%d", done, total)
+            }
+            NSLog("[PicFacet] done — ok=%d failed=%d",
+                  result.succeeded.count, result.failed.count)
+            for f in result.failed {
+                NSLog("[PicFacet] fail %@: %@",
+                      f.url.lastPathComponent, f.error.localizedDescription)
+            }
         }
     }
 
@@ -50,51 +48,51 @@ final class ServiceProvider: NSObject {
     // MARK: - Convert
 
     @objc func convertToJPEG(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.convert($0, to: .jpeg, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(format: .jpeg))
     }
     @objc func convertToPNG(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.convert($0, to: .png, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(format: .png))
     }
     @objc func convertToWebP(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.convert($0, to: .webp, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(format: .webp))
     }
     @objc func convertToTIFF(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.convert($0, to: .tiff, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(format: .tiff))
     }
     @objc func convertToGIF(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.convert($0, to: .gif, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(format: .gif))
     }
     @objc func convertToBMP(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.convert($0, to: .bmp, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(format: .bmp))
     }
     @objc func convertToHEIC(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.convert($0, to: .heic, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(format: .heic))
     }
 
     // MARK: - Resize presets
 
     @objc func resize25(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.resize($0, byPercent: 25, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(resize: .percent(25)))
     }
     @objc func resize50(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.resize($0, byPercent: 50, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(resize: .percent(50)))
     }
     @objc func resize75(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.resize($0, byPercent: 75, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(resize: .percent(75)))
     }
 
     // MARK: - DPI presets
 
     @objc func dpi72(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.changeDPI($0, to: 72, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(dpi: 72))
     }
     @objc func dpi150(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.changeDPI($0, to: 150, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(dpi: 150))
     }
     @objc func dpi300(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.changeDPI($0, to: 300, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(dpi: 300))
     }
     @objc func dpi600(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard) { ImageProcessor.shared.changeDPI($0, to: 600, onProgress: Self.progress, onComplete: Self.complete) }
+        run(pboard, BatchSelection(dpi: 600))
     }
 }

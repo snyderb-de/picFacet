@@ -46,7 +46,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.segmented)
                     .frame(width: 220)
-                    .onChange(of: appearance) { v in
+                    .onChange(of: appearance) { _, v in
                         PicFacetSettings.shared.appAppearance = v
                         applyAppearance(v)
                     }
@@ -65,7 +65,7 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .frame(width: 140)
-                    .onChange(of: defaultFormat) { PicFacetSettings.shared.defaultFormat = $0 }
+                    .onChange(of: defaultFormat) { _, new in PicFacetSettings.shared.defaultFormat = new }
                 } label: {
                     Text("Default format")
                     Text("Pre-selected format in the converter.")
@@ -79,7 +79,7 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .frame(width: 100)
-                    .onChange(of: defaultResizePercent) { PicFacetSettings.shared.defaultResizePercent = $0 }
+                    .onChange(of: defaultResizePercent) { _, new in PicFacetSettings.shared.defaultResizePercent = new }
                 } label: {
                     Text("Default resize")
                     Text("Pre-selected resize percentage.")
@@ -93,7 +93,7 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .frame(width: 120)
-                    .onChange(of: defaultDPI) { PicFacetSettings.shared.defaultDPI = $0 }
+                    .onChange(of: defaultDPI) { _, new in PicFacetSettings.shared.defaultDPI = new }
                 } label: {
                     Text("Default DPI")
                     Text("Pre-selected DPI setting.")
@@ -105,19 +105,19 @@ struct SettingsView: View {
                     Text("Overwrite source files")
                     Text("Replace the original instead of writing alongside it.")
                 }
-                .onChange(of: overwriteSource) { PicFacetSettings.shared.overwriteSource = $0 }
+                .onChange(of: overwriteSource) { _, new in PicFacetSettings.shared.overwriteSource = new }
 
                 Toggle(isOn: $onlyIfSmaller) {
                     Text("Keep converted file only if smaller")
                     Text("Discard the new file when it isn't a size win.")
                 }
-                .onChange(of: onlyIfSmaller) { PicFacetSettings.shared.onlyIfSmaller = $0 }
+                .onChange(of: onlyIfSmaller) { _, new in PicFacetSettings.shared.onlyIfSmaller = new }
 
                 Toggle(isOn: $deleteOriginalAfterConvert) {
                     Text("Delete original after conversion")
                     Text("Remove the source file once the new one is saved.")
                 }
-                .onChange(of: deleteOriginalAfterConvert) { PicFacetSettings.shared.deleteOriginalAfterConvert = $0 }
+                .onChange(of: deleteOriginalAfterConvert) { _, new in PicFacetSettings.shared.deleteOriginalAfterConvert = new }
             }
 
             Section("Resize") {
@@ -125,7 +125,7 @@ struct SettingsView: View {
                     Text("Keep proportions by default")
                     Text("Lock the aspect ratio when resizing.")
                 }
-                .onChange(of: isProportional) { PicFacetSettings.shared.isProportional = $0 }
+                .onChange(of: isProportional) { _, new in PicFacetSettings.shared.isProportional = new }
             }
         }
         .formStyle(.grouped)

@@ -32,85 +32,35 @@ final class ChooserWindowController {
         } else {
             window?.contentViewController = NSHostingController(rootView: root)
         }
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }
 
     private func close() { window?.orderOut(nil) }
 
-    private func run(selection: ChooserSelection, urls: [URL]) {
+    private func run(selection: BatchSelection, urls: [URL]) {
         guard selection.hasSelection else { return }
 
-        let progress: (Int, Int) -> Void = { d, t in NSLog("[PicFacet] %d/%d", d, t) }
-        let complete: (ProcessingResult) -> Void = { r in
+        Task { @MainActor in
+            let r = await ImageProcessor.process(urls, selection) { d, t in
+                NSLog("[PicFacet] %d/%d", d, t)
+            }
             NSLog("[PicFacet] done ok=%d failed=%d", r.succeeded.count, r.failed.count)
-            // Show completion alert
-            DispatchQueue.main.async {
-                let alert = NSAlert()
-                alert.messageText = "Processing Complete"
-                alert.informativeText = "Successfully processed \(r.succeeded.count) file(s)."
-                if r.hasErrors {
-                    alert.informativeText += "\n\(r.failed.count) file(s) failed."
-                }
-                alert.alertStyle = r.hasErrors ? .warning : .informational
-                alert.addButton(withTitle: "OK")
-                alert.runModal()
-            }
-        }
 
-        func runResize(_ input: [URL], previousFailures: [(url: URL, error: Error)]) {
-            guard let resize = selection.resize else {
-                runDPI(input, previousFailures: previousFailures)
-                return
+            let alert = NSAlert()
+            alert.messageText = "Processing Complete"
+            alert.informativeText = "Successfully processed \(r.succeeded.count) file(s)."
+            if r.hasErrors {
+                alert.informativeText += "\n\(r.failed.count) file(s) failed."
             }
-            ImageProcessor.shared.resize(input, operation: resize, onProgress: progress) { result in
-                let failures = previousFailures + result.failed
-                if selection.dpi == nil {
-                    complete(ProcessingResult(succeeded: result.succeeded, failed: failures))
-                } else {
-                    runDPI(result.succeeded, previousFailures: failures)
-                }
-            }
-        }
-
-        func runDPI(_ input: [URL], previousFailures: [(url: URL, error: Error)]) {
-            guard let dpi = selection.dpi else {
-                complete(ProcessingResult(succeeded: input, failed: previousFailures))
-                return
-            }
-            ImageProcessor.shared.changeDPI(input, to: dpi, onProgress: progress) { result in
-                complete(ProcessingResult(
-                    succeeded: result.succeeded,
-                    failed: previousFailures + result.failed
-                ))
-            }
-        }
-
-        if let format = selection.format {
-            ImageProcessor.shared.convert(urls, to: format, onProgress: progress) { result in
-                if selection.resize == nil && selection.dpi == nil {
-                    complete(result)
-                } else {
-                    runResize(result.succeeded, previousFailures: result.failed)
-                }
-            }
-        } else {
-            runResize(urls, previousFailures: [])
+            alert.alertStyle = r.hasErrors ? .warning : .informational
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
         }
     }
 }
 
 // MARK: - Operations
-
-struct ChooserSelection: Hashable {
-    var format: ImageFormat?
-    var resize: ResizeOperation?
-    var dpi: Int?
-
-    var hasSelection: Bool {
-        format != nil || resize != nil || dpi != nil
-    }
-}
 
 private enum ResizeMode: Hashable {
     case none
@@ -125,7 +75,7 @@ private enum ResizeMode: Hashable {
 struct ChooserView: View {
     let urls: [URL]
     let onCancel: () -> Void
-    let onPick: (ChooserSelection) -> Void
+    let onPick: (BatchSelection) -> Void
 
     @State private var selectedFormat: ImageFormat?
     @State private var selectedResizeMode: ResizeMode = .none
@@ -137,7 +87,7 @@ struct ChooserView: View {
 
     private let percents = [25, 50, 75]
 
-    init(urls: [URL], onCancel: @escaping () -> Void, onPick: @escaping (ChooserSelection) -> Void) {
+    init(urls: [URL], onCancel: @escaping () -> Void, onPick: @escaping (BatchSelection) -> Void) {
         self.urls = urls
         self.onCancel = onCancel
         self.onPick = onPick
@@ -223,14 +173,8 @@ struct ChooserView: View {
     }
 
     var body: some View {
-        Group {
-            if #available(macOS 26.0, *) {
-                GlassEffectContainer(spacing: 18) {
-                    rootContent
-                }
-            } else {
-                rootContent
-            }
+        GlassEffectContainer(spacing: 18) {
+            rootContent
         }
         .padding(30)
         .frame(
@@ -399,40 +343,26 @@ struct ChooserView: View {
     
     private func loadThumbnails() {
         for url in urls.prefix(12) {
-            DispatchQueue.global(qos: .userInitiated).async {
-                if let thumbnail = createThumbnail(for: url) {
-                    DispatchQueue.main.async {
-                        thumbnails[url] = thumbnail
-                    }
+            Task {
+                let cgImage = await Task.detached(priority: .userInitiated) {
+                    Self.createThumbnail(for: url)
+                }.value
+                if let cgImage {
+                    thumbnails[url] = NSImage(cgImage: cgImage, size: .zero)
                 }
             }
         }
     }
-    
-    private func createThumbnail(for url: URL) -> NSImage? {
-        guard let image = NSImage(contentsOf: url) else { return nil }
-        
-        let size = NSSize(width: 420, height: 260)
-        let thumbnail = NSImage(size: size)
-        thumbnail.lockFocus()
-        
-        let aspectRatio = image.size.width / image.size.height
-        var drawRect = NSRect(origin: .zero, size: size)
-        
-        if aspectRatio > 1 {
-            let newHeight = size.width / aspectRatio
-            drawRect.origin.y = (size.height - newHeight) / 2
-            drawRect.size.height = newHeight
-        } else {
-            let newWidth = size.height * aspectRatio
-            drawRect.origin.x = (size.width - newWidth) / 2
-            drawRect.size.width = newWidth
-        }
-        
-        image.draw(in: drawRect)
-        thumbnail.unlockFocus()
-        
-        return thumbnail
+
+    /// Decodes a downsampled thumbnail off the main actor.
+    nonisolated private static func createThumbnail(for url: URL) -> CGImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 840
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
     // MARK: Header
@@ -579,7 +509,7 @@ struct ChooserView: View {
                 .pfSecondaryActionStyle()
 
             Button {
-                onPick(ChooserSelection(
+                onPick(BatchSelection(
                     format: selectedFormat,
                     resize: resizeOperation,
                     dpi: selectedDPI
@@ -611,7 +541,7 @@ struct ChooserView: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(resizeInputIsValid ? PFDesign.outlineVariant.opacity(0.2) : Color.red.opacity(0.55), lineWidth: 1)
                 }
-                .onChange(of: text.wrappedValue) { newValue in
+                .onChange(of: text.wrappedValue) { _, newValue in
                     text.wrappedValue = digitsOnly(newValue)
                 }
 

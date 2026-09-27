@@ -12,6 +12,11 @@ struct DPIEngine {
     ) -> [String: Any] {
         var props = properties
 
+        // ImageIO reads existing top-level DPI keys back on write and lets them win
+        // over the format dictionaries, so they must be updated too.
+        props[kCGImagePropertyDPIWidth as String] = dpi
+        props[kCGImagePropertyDPIHeight as String] = dpi
+
         switch format {
 
         case .jpeg:

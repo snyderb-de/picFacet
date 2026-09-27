@@ -43,18 +43,21 @@ PicFacet.xcodeproj           (generated — gitignored)
 │   ├── AppDelegate.swift          — registers NSApp.servicesProvider
 │   ├── ServiceProvider.swift      — @objc handlers for every Quick Action
 │   ├── ChooserWindow.swift        — full picker window for "PicFacet…"
+│   ├── BatchWindow.swift          — drag-and-drop batch processor
+│   ├── PicFacetDesign.swift       — PFDesign tokens + Liquid Glass modifiers
 │   ├── OnboardingWindow.swift     — first-launch help window
 │   ├── MenuBarController.swift    — NSStatusItem + settings
 │   └── SettingsView.swift
 │
-└── PicFacetCore             (shared framework)
+├── PicFacetCoreTests        (Swift Testing, runs with the PicFacet scheme)
+│
+└── PicFacetCore             (shared framework, no UI)
     ├── ImageFormat.swift          — format enum + extension helpers
-    ├── ImageProcessor.swift       — orchestrator (OperationQueue, max 4 concurrent)
+    ├── ImageProcessor.swift       — pipeline: BatchSelection + OutputPolicy in, one write per file (max 4 concurrent)
     ├── ConversionEngine.swift     — ImageIO read/write
     ├── ResizeEngine.swift         — CGContext high-quality resize
     ├── DPIEngine.swift            — per-format DPI metadata patching
     ├── FileOutputManager.swift    — output paths, dedup, overwrite rules
-    ├── ProgressWindow.swift       — drag-and-drop batch processor
     ├── PicFacetSettings.swift     — UserDefaults model
     ├── ProcessingResult.swift
     └── PicFacetError.swift
@@ -70,8 +73,8 @@ The first cut of this project used a Finder Sync Extension (the heavy `FIFinderS
 
 ### Prerequisites
 
-- **macOS 13+**
-- **Xcode 15+** (Xcode 26+ recommended for Tahoe-era APIs)
+- **macOS 26+** (Liquid Glass APIs are used without fallbacks)
+- **Xcode 26+**, Swift 6 language mode
 - **Nix** preferred, or **Homebrew**
 - **xcodegen** (`nix shell nixpkgs#xcodegen` or `brew install xcodegen`)
 

@@ -119,7 +119,7 @@ final class MenuBarController {
     }
     
     @objc private func openBatchProcessor() {
-        ProgressWindowController.shared.show()
+        BatchWindowController.shared.show()
     }
 
     @objc private func openSettings() {
@@ -139,7 +139,7 @@ final class MenuBarController {
             settingsWindow = window
         }
         settingsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
     }
 
     @objc private func openOnboarding() {

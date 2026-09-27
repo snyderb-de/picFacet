@@ -5,8 +5,8 @@ struct FileOutputManager {
     // MARK: - Output URL
 
     /// Output URL for a format-conversion operation (extension changes).
-    static func outputURL(for inputURL: URL, targetFormat: ImageFormat, settings: PicFacetSettings) -> URL {
-        let dir = outputDirectory(for: inputURL, settings: settings)
+    static func outputURL(for inputURL: URL, targetFormat: ImageFormat, policy: OutputPolicy) -> URL {
+        let dir = outputDirectory(for: inputURL, policy: policy)
         let base = inputURL.deletingPathExtension().lastPathComponent
         let candidate = dir
             .appendingPathComponent(base)
@@ -14,18 +14,18 @@ struct FileOutputManager {
 
         // The source and output are different files (different extension), so
         // overwriteSource here controls whether we clobber an existing output file.
-        if FileManager.default.fileExists(atPath: candidate.path) && !settings.overwriteSource {
+        if FileManager.default.fileExists(atPath: candidate.path) && !policy.overwriteSource {
             return deduplicated(candidate)
         }
         return candidate
     }
 
     /// Output URL for an in-place operation where format stays the same (resize, DPI).
-    static func outputURL(for inputURL: URL, settings: PicFacetSettings) -> URL {
-        if settings.overwriteSource {
+    static func outputURL(for inputURL: URL, policy: OutputPolicy) -> URL {
+        if policy.overwriteSource {
             return inputURL
         }
-        let dir = outputDirectory(for: inputURL, settings: settings)
+        let dir = outputDirectory(for: inputURL, policy: policy)
         let base = inputURL.deletingPathExtension().lastPathComponent
         let ext  = inputURL.pathExtension
         let candidate = dir.appendingPathComponent(base).appendingPathExtension(ext)
@@ -40,8 +40,8 @@ struct FileOutputManager {
     // MARK: - Guards
 
     /// Returns true if the operation should be skipped per the "only if smaller" setting.
-    static func shouldSkip(originalSize: CGSize, newSize: CGSize, settings: PicFacetSettings) -> Bool {
-        guard settings.onlyIfSmaller else { return false }
+    static func shouldSkip(originalSize: CGSize, newSize: CGSize, policy: OutputPolicy) -> Bool {
+        guard policy.onlyIfSmaller else { return false }
         // Skip when the new dimensions are not smaller in at least one axis
         return newSize.width >= CGFloat(1) &&
                newSize.height >= CGFloat(1) &&
@@ -51,18 +51,15 @@ struct FileOutputManager {
 
     // MARK: - Cleanup
 
-    static func deleteOriginal(_ url: URL, settings: PicFacetSettings) {
-        guard settings.deleteOriginalAfterConvert else { return }
+    static func deleteOriginal(_ url: URL, policy: OutputPolicy) {
+        guard policy.deleteOriginalAfterConvert else { return }
         try? FileManager.default.removeItem(at: url)
     }
 
     // MARK: - Private helpers
 
-    private static func outputDirectory(for url: URL, settings: PicFacetSettings) -> URL {
-        if let custom = settings.customOutputFolder {
-            return URL(fileURLWithPath: custom)
-        }
-        return url.deletingLastPathComponent()
+    private static func outputDirectory(for url: URL, policy: OutputPolicy) -> URL {
+        policy.customOutputFolder ?? url.deletingLastPathComponent()
     }
 
     private static func deduplicated(_ url: URL) -> URL {

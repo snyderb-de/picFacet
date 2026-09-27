@@ -1,184 +1,139 @@
 import Foundation
 import CoreGraphics
 
-/// Orchestrates all image processing. Max 4 concurrent jobs.
-/// Progress and completion callbacks always fire on the main queue.
-public final class ImageProcessor {
-    public static let shared = ImageProcessor()
+/// What to do to every file in a batch. Any combination of steps may be set;
+/// they are applied to each file in memory, in the order convert → resize → DPI,
+/// and the file is written exactly once.
+public struct BatchSelection: Hashable, Sendable {
+    public var format: ImageFormat?
+    public var resize: ResizeOperation?
+    public var dpi: Int?
 
-    private let queue: OperationQueue = {
-        let q = OperationQueue()
-        q.maxConcurrentOperationCount = 4
-        q.qualityOfService = .userInitiated
-        return q
-    }()
+    public init(format: ImageFormat? = nil, resize: ResizeOperation? = nil, dpi: Int? = nil) {
+        self.format = format
+        self.resize = resize
+        self.dpi = dpi
+    }
 
-    private init() {}
+    public var hasSelection: Bool {
+        format != nil || resize != nil || dpi != nil
+    }
+}
 
-    // MARK: - Public API
+/// Snapshot of the user settings that decide where and whether output is written.
+/// Captured once per batch so a settings change mid-batch cannot leak in.
+public struct OutputPolicy: Sendable {
+    public var overwriteSource: Bool
+    public var onlyIfSmaller: Bool
+    public var deleteOriginalAfterConvert: Bool
+    public var isProportional: Bool
+    /// nil = same folder as source
+    public var customOutputFolder: URL?
 
-    public func convert(
-        _ urls: [URL],
-        to format: ImageFormat,
-        onProgress: @escaping (Int, Int) -> Void,
-        onComplete: @escaping (ProcessingResult) -> Void
+    public init(
+        overwriteSource: Bool = false,
+        onlyIfSmaller: Bool = false,
+        deleteOriginalAfterConvert: Bool = false,
+        isProportional: Bool = true,
+        customOutputFolder: URL? = nil
     ) {
+        self.overwriteSource = overwriteSource
+        self.onlyIfSmaller = onlyIfSmaller
+        self.deleteOriginalAfterConvert = deleteOriginalAfterConvert
+        self.isProportional = isProportional
+        self.customOutputFolder = customOutputFolder
+    }
+
+    public static var current: OutputPolicy {
         let settings = PicFacetSettings.shared
-        batch(urls: urls, onProgress: onProgress, onComplete: onComplete) { url in
-            let (image, props) = try ConversionEngine.readImage(from: url)
-            let out = FileOutputManager.outputURL(for: url, targetFormat: format, settings: settings)
-            try ConversionEngine.writeImage(image, properties: props, to: out, format: format)
-            if out.path != url.path {
-                FileOutputManager.deleteOriginal(url, settings: settings)
-            }
-            return out
-        }
+        return OutputPolicy(
+            overwriteSource: settings.overwriteSource,
+            onlyIfSmaller: settings.onlyIfSmaller,
+            deleteOriginalAfterConvert: settings.deleteOriginalAfterConvert,
+            isProportional: settings.isProportional,
+            customOutputFolder: settings.customOutputFolder.map { URL(fileURLWithPath: $0) }
+        )
     }
+}
 
-    public func resize(
+/// Runs a batch selection over a set of files. Max 4 files in flight.
+public enum ImageProcessor {
+    static let maxConcurrentFiles = 4
+
+    /// Processes every URL and returns once all are done.
+    /// `onProgress` receives (completed, total) on the main actor after each file.
+    public static func process(
         _ urls: [URL],
-        byPercent percent: Double,
-        onProgress: @escaping (Int, Int) -> Void,
-        onComplete: @escaping (ProcessingResult) -> Void
-    ) {
-        resizeImpl(urls: urls, onProgress: onProgress, onComplete: onComplete) { image in
-            ResizeEngine.size(for: image, byPercent: percent)
-        }
-    }
-
-    public func resize(
-        _ urls: [URL],
-        operation: ResizeOperation,
-        onProgress: @escaping (Int, Int) -> Void,
-        onComplete: @escaping (ProcessingResult) -> Void
-    ) {
-        switch operation {
-        case .percent(let percent):
-            resize(urls, byPercent: Double(percent), onProgress: onProgress, onComplete: onComplete)
-        case .width(let width):
-            resize(urls, maxWidth: width, onProgress: onProgress, onComplete: onComplete)
-        case .height(let height):
-            resize(urls, maxHeight: height, onProgress: onProgress, onComplete: onComplete)
-        }
-    }
-
-    public func resize(
-        _ urls: [URL],
-        maxWidth width: Int,
-        onProgress: @escaping (Int, Int) -> Void,
-        onComplete: @escaping (ProcessingResult) -> Void
-    ) {
-        let proportional = PicFacetSettings.shared.isProportional
-        resizeImpl(urls: urls, onProgress: onProgress, onComplete: onComplete) { image in
-            ResizeEngine.size(for: image, maxWidth: width, proportional: proportional)
-        }
-    }
-
-    public func resize(
-        _ urls: [URL],
-        maxHeight height: Int,
-        onProgress: @escaping (Int, Int) -> Void,
-        onComplete: @escaping (ProcessingResult) -> Void
-    ) {
-        let proportional = PicFacetSettings.shared.isProportional
-        resizeImpl(urls: urls, onProgress: onProgress, onComplete: onComplete) { image in
-            ResizeEngine.size(for: image, maxHeight: height, proportional: proportional)
-        }
-    }
-
-    public func changeDPI(
-        _ urls: [URL],
-        to dpi: Int,
-        onProgress: @escaping (Int, Int) -> Void,
-        onComplete: @escaping (ProcessingResult) -> Void
-    ) {
-        let settings = PicFacetSettings.shared
-        batch(urls: urls, onProgress: onProgress, onComplete: onComplete) { url in
-            let (image, props) = try ConversionEngine.readImage(from: url)
-            let format = ImageFormat(fileExtension: url.pathExtension) ?? .jpeg
-            let updatedProps = DPIEngine.updatedProperties(props, dpi: dpi, for: format)
-            let out = FileOutputManager.outputURL(for: url, settings: settings)
-            try ConversionEngine.writeImage(image, properties: updatedProps, to: out, format: format)
-            return out
-        }
-    }
-
-    // MARK: - Private
-
-    private func resizeImpl(
-        urls: [URL],
-        onProgress: @escaping (Int, Int) -> Void,
-        onComplete: @escaping (ProcessingResult) -> Void,
-        sizeBlock: @escaping (CGImage) -> CGSize
-    ) {
-        let settings = PicFacetSettings.shared
-        batch(urls: urls, onProgress: onProgress, onComplete: onComplete) { url in
-            let (image, props) = try ConversionEngine.readImage(from: url)
-            let newSize = sizeBlock(image)
-            let originalSize = CGSize(width: image.width, height: image.height)
-
-            if FileOutputManager.shouldSkip(originalSize: originalSize, newSize: newSize, settings: settings) {
-                return url // No-op, return original path
-            }
-
-            let resized = try ResizeEngine.resize(image, toSize: newSize)
-            let format = ImageFormat(fileExtension: url.pathExtension) ?? .jpeg
-            let out = FileOutputManager.outputURL(for: url, settings: settings)
-            try ConversionEngine.writeImage(resized, properties: props, to: out, format: format)
-            return out
-        }
-    }
-
-    /// Generic batch executor. Runs each URL through `work` on the shared queue,
-    /// accumulates results, fires progress on main queue, then completion.
-    private func batch(
-        urls: [URL],
-        onProgress: @escaping (Int, Int) -> Void,
-        onComplete: @escaping (ProcessingResult) -> Void,
-        work: @escaping (URL) throws -> URL
-    ) {
+        _ selection: BatchSelection,
+        policy: OutputPolicy = .current,
+        onProgress: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in }
+    ) async -> ProcessingResult {
         let total = urls.count
-        guard total > 0 else {
-            DispatchQueue.main.async { onComplete(ProcessingResult(succeeded: [], failed: [])) }
-            return
-        }
-
         var succeeded: [URL] = []
         var failed: [(url: URL, error: Error)] = []
-        var completed = 0
-        let lock = NSLock()
-        let group = DispatchGroup()
 
-        for url in urls {
-            group.enter()
-            queue.addOperation {
-                defer { group.leave() }
+        await withTaskGroup(of: (URL, Result<URL, Error>).self) { group in
+            var pending = urls.makeIterator()
 
-                // Sandboxed extensions must explicitly unlock Finder-vended URLs
-                let accessed = url.startAccessingSecurityScopedResource()
-                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-
-                do {
-                    let output = try work(url)
-                    lock.lock()
-                    succeeded.append(output)
-                    completed += 1
-                    let c = completed
-                    lock.unlock()
-                    DispatchQueue.main.async { onProgress(c, total) }
-                } catch {
-                    lock.lock()
-                    failed.append((url, error))
-                    completed += 1
-                    let c = completed
-                    lock.unlock()
-                    DispatchQueue.main.async { onProgress(c, total) }
+            func addNext() -> Bool {
+                guard let url = pending.next() else { return false }
+                group.addTask(priority: .userInitiated) {
+                    (url, Result { try processFile(url, selection, policy: policy) })
                 }
+                return true
+            }
+
+            for _ in 0..<maxConcurrentFiles where !addNext() { break }
+
+            for await (url, result) in group {
+                switch result {
+                case .success(let output): succeeded.append(output)
+                case .failure(let error): failed.append((url, error))
+                }
+                await onProgress(succeeded.count + failed.count, total)
+                _ = addNext()
             }
         }
 
-        group.notify(queue: .main) {
-            onComplete(ProcessingResult(succeeded: succeeded, failed: failed))
+        return ProcessingResult(succeeded: succeeded, failed: failed)
+    }
+
+    /// Applies every selected step to one file and writes it once.
+    /// Returns the output URL, or `url` unchanged when there was nothing to write.
+    static func processFile(_ url: URL, _ selection: BatchSelection, policy: OutputPolicy) throws -> URL {
+        // Finder-vended URLs may be security scoped
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+
+        var (image, properties) = try ConversionEngine.readImage(from: url)
+        let targetFormat = selection.format ?? ImageFormat(fileExtension: url.pathExtension) ?? .jpeg
+        var needsWrite = selection.format != nil
+
+        if let resize = selection.resize {
+            let originalSize = CGSize(width: image.width, height: image.height)
+            let newSize = ResizeEngine.size(for: image, operation: resize, proportional: policy.isProportional)
+            if !FileOutputManager.shouldSkip(originalSize: originalSize, newSize: newSize, policy: policy) {
+                image = try ResizeEngine.resize(image, toSize: newSize)
+                needsWrite = true
+            }
         }
+
+        if let dpi = selection.dpi {
+            properties = DPIEngine.updatedProperties(properties, dpi: dpi, for: targetFormat)
+            needsWrite = true
+        }
+
+        guard needsWrite else { return url }
+
+        let output = selection.format.map {
+            FileOutputManager.outputURL(for: url, targetFormat: $0, policy: policy)
+        } ?? FileOutputManager.outputURL(for: url, policy: policy)
+
+        try ConversionEngine.writeImage(image, properties: properties, to: output, format: targetFormat)
+
+        if selection.format != nil && output.path != url.path {
+            FileOutputManager.deleteOriginal(url, policy: policy)
+        }
+        return output
     }
 }

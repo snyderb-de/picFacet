@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ProcessingResult {
+public struct ProcessingResult: Sendable {
     public let succeeded: [URL]
     public let failed: [(url: URL, error: Error)]
 

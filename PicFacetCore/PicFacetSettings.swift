@@ -1,9 +1,10 @@
 import Foundation
 
-public final class PicFacetSettings {
+// UserDefaults is thread-safe; the only stored property is an immutable reference to it.
+public final class PicFacetSettings: @unchecked Sendable {
     public static let shared = PicFacetSettings()
 
-    public enum AppAppearance: String, CaseIterable {
+    public enum AppAppearance: String, CaseIterable, Sendable {
         case system
         case light
         case dark

@@ -82,34 +82,14 @@ struct PFPanelBackground: ViewModifier {
     var interactive: Bool = false
 
     func body(content: Content) -> some View {
-        if #available(macOS 26.0, *) {
-            if interactive {
-                content
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: PFDesign.rCard))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous)
-                            .strokeBorder(PFDesign.outlineVariant.opacity(0.18), lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.12), radius: 28, x: 0, y: 14)
-            } else {
-                content
-                    .glassEffect(.regular, in: .rect(cornerRadius: PFDesign.rCard))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous)
-                            .strokeBorder(PFDesign.outlineVariant.opacity(0.18), lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.12), radius: 28, x: 0, y: 14)
-            }
-        } else {
-            content
-                .background(PFDesign.surfaceLowest,
-                          in: RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous)
-                        .strokeBorder(PFDesign.outlineVariant.opacity(0.15), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 26, x: 0, y: 12)
-        }
+        content
+            .glassEffect(interactive ? .regular.interactive() : .regular,
+                         in: .rect(cornerRadius: PFDesign.rCard))
+            .overlay(
+                RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous)
+                    .strokeBorder(PFDesign.outlineVariant.opacity(0.18), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.12), radius: 28, x: 0, y: 14)
     }
 }
 
@@ -138,27 +118,16 @@ struct PFChip: View {
     var systemImage: String? = nil
     let action: () -> Void
 
-    @State private var hovering = false
-    @State private var pressing = false
-
     var body: some View {
-        if #available(macOS 26.0, *) {
-            if isSelected {
-                Button(action: action) {
-                    chipLabel
-                }
+        if isSelected {
+            Button(action: action) { chipLabel }
                 .buttonStyle(.glassProminent)
                 .controlSize(.small)
                 .tint(PFDesign.primary)
-            } else {
-                Button(action: action) {
-                    chipLabel
-                }
+        } else {
+            Button(action: action) { chipLabel }
                 .buttonStyle(.glass)
                 .controlSize(.small)
-            }
-        } else {
-            fallbackChip
         }
     }
 
@@ -174,120 +143,23 @@ struct PFChip: View {
         .padding(.horizontal, 3)
         .padding(.vertical, 1)
     }
-
-    private var fallbackChip: some View {
-        Button(action: action) {
-            chipLabel
-            .padding(.horizontal, 13)
-            .padding(.vertical, 8)
-            .foregroundStyle(isSelected ? .white : PFDesign.onSurface)
-            .modifier(ChipBackgroundModifier(isSelected: isSelected,
-                                            hovering: hovering,
-                                            pressing: pressing))
-            .scaleEffect(pressing ? 0.96 : 1.0)
-            .animation(.easeInOut(duration: 0.12), value: pressing)
-            .animation(.easeInOut(duration: 0.15), value: hovering)
-        }
-        .buttonStyle(.plain)
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in pressing = true }
-                .onEnded { _ in pressing = false }
-        )
-        .onHover { hovering = $0 }
-    }
 }
+
+// MARK: - Actions
 
 extension View {
-    @ViewBuilder
     func pfPrimaryActionStyle() -> some View {
-        if #available(macOS 26.0, *) {
-            self
-                .frame(maxWidth: .infinity)
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                .tint(PFDesign.primary)
-        } else {
-            self.buttonStyle(PFPrimaryButtonStyle())
-        }
-    }
-
-    @ViewBuilder
-    func pfSecondaryActionStyle() -> some View {
-        if #available(macOS 26.0, *) {
-            self
-                .buttonStyle(.glass)
-                .controlSize(.regular)
-        } else {
-            self.buttonStyle(PFSecondaryButtonStyle())
-        }
-    }
-}
-
-private struct ChipBackgroundModifier: ViewModifier {
-    let isSelected: Bool
-    let hovering: Bool
-    let pressing: Bool
-    
-    func body(content: Content) -> some View {
-        content
-            .background {
-                RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
-                    .fill(isSelected ? AnyShapeStyle(PFDesign.primaryGradient) : AnyShapeStyle(hovering ? PFDesign.surfaceLowest : PFDesign.surfaceLow))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
-                    .strokeBorder(isSelected ? PFDesign.primaryBright.opacity(0.5) : PFDesign.outlineVariant.opacity(0.2), lineWidth: 1)
-            }
-            .shadow(color: isSelected ? PFDesign.primary.opacity(pressing ? 0.08 : 0.16) : .clear,
-                    radius: pressing ? 3 : 7,
-                    x: 0,
-                    y: pressing ? 1 : 3)
-    }
-}
-
-// MARK: - Primary CTA
-
-struct PFPrimaryButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(.white)
+        self
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 13)
-            .background(PFDesign.primaryGradient, in: RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
-                    .strokeBorder(Color.white.opacity(isEnabled ? 0.22 : 0), lineWidth: 1)
-            }
-            .shadow(color: PFDesign.primary.opacity(isEnabled ? 0.28 : 0), radius: 14, x: 0, y: 7)
-            .scaleEffect(configuration.isPressed ? 0.99 : 1)
-            .opacity(isEnabled ? 1 : 0.38)
-            .animation(.easeInOut(duration: 0.12), value: configuration.isPressed)
+            .buttonStyle(.glassProminent)
+            .controlSize(.large)
+            .tint(PFDesign.primary)
     }
-}
 
-// MARK: - Secondary button
-
-struct PFSecondaryButtonStyle: ButtonStyle {
-    @State private var hovering = false
-    
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(PFDesign.onSurface)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(hovering ? PFDesign.surfaceLowest : PFDesign.surfaceLow,
-                        in: RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
-                    .strokeBorder(PFDesign.outlineVariant.opacity(0.16), lineWidth: 1)
-            }
-            .opacity(configuration.isPressed ? 0.85 : 1)
-            .onHover { hovering = $0 }
+    func pfSecondaryActionStyle() -> some View {
+        self
+            .buttonStyle(.glass)
+            .controlSize(.regular)
     }
 }
 
@@ -353,7 +225,7 @@ struct PFEmptyState: View {
             
             if let action = action, let actionLabel = actionLabel {
                 Button(actionLabel, action: action)
-                    .buttonStyle(PFSecondaryButtonStyle())
+                    .pfSecondaryActionStyle()
                     .padding(.top, 4)
             }
         }
@@ -461,10 +333,10 @@ struct PFInfoRow: View {
                 // Buttons
                 HStack(spacing: 12) {
                     Button("Secondary") { }
-                        .buttonStyle(PFSecondaryButtonStyle())
+                        .pfSecondaryActionStyle()
                     
                     Button("Primary Action") { }
-                        .buttonStyle(PFPrimaryButtonStyle())
+                        .pfPrimaryActionStyle()
                 }
             }
         }

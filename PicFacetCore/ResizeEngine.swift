@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 
-public enum ResizeOperation: Hashable {
+public enum ResizeOperation: Hashable, Sendable {
     case percent(Int)
     case width(Int)
     case height(Int)
@@ -50,6 +50,17 @@ struct ResizeEngine {
     }
 
     // MARK: - Size calculators
+
+    static func size(for image: CGImage, operation: ResizeOperation, proportional: Bool) -> CGSize {
+        switch operation {
+        case .percent(let percent):
+            return size(for: image, byPercent: Double(percent))
+        case .width(let width):
+            return size(for: image, maxWidth: width, proportional: proportional)
+        case .height(let height):
+            return size(for: image, maxHeight: height, proportional: proportional)
+        }
+    }
 
     static func size(for image: CGImage, byPercent percent: Double) -> CGSize {
         let scale = CGFloat(percent / 100.0)

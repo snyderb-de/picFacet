@@ -30,7 +30,7 @@ final class OnboardingWindowController {
             win.center()
             window = win
         }
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }
 }

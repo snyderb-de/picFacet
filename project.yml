@@ -2,13 +2,13 @@ name: PicFacet
 options:
   bundleIdPrefix: com.picfacet
   deploymentTarget:
-    macOS: "13.0"
+    macOS: "26.0"
   createIntermediateGroups: true
 
 settings:
   base:
-    SWIFT_VERSION: "5"
-    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    SWIFT_VERSION: "6"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_STYLE: Automatic
 
@@ -17,7 +17,7 @@ targets:
   PicFacetCore:
     type: framework
     platform: macOS
-    deploymentTarget: "13.0"
+    deploymentTarget: "26.0"
     sources:
       - PicFacetCore
     settings:
@@ -30,7 +30,7 @@ targets:
   PicFacet:
     type: application
     platform: macOS
-    deploymentTarget: "13.0"
+    deploymentTarget: "26.0"
     sources:
       - PicFacet
     settings:
@@ -38,8 +38,25 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.picfacet.app
         INFOPLIST_FILE: PicFacet/Info.plist
         CODE_SIGN_ENTITLEMENTS: PicFacet/PicFacet.entitlements
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
     dependencies:
       - target: PicFacetCore
         embed: true
         codeSign: true
+    scheme:
+      testTargets:
+        - PicFacetCoreTests
+
+  PicFacetCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - PicFacetCoreTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.picfacet.core.tests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: PicFacetCore
