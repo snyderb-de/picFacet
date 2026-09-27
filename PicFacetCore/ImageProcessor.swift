@@ -20,8 +20,9 @@ public struct BatchSelection: Hashable, Sendable {
     }
 }
 
-/// Snapshot of the user settings that decide where and whether output is written.
-/// Captured once per batch so a settings change mid-batch cannot leak in.
+/// Where and whether output is written. Callers snapshot it once per batch
+/// (usually `PicFacetSettings.outputPolicy`) so a settings change mid-batch
+/// cannot leak in, and tests pass plain values.
 public struct OutputPolicy: Sendable {
     public var overwriteSource: Bool
     public var onlyIfSmaller: Bool
@@ -43,17 +44,6 @@ public struct OutputPolicy: Sendable {
         self.isProportional = isProportional
         self.customOutputFolder = customOutputFolder
     }
-
-    public static var current: OutputPolicy {
-        let settings = PicFacetSettings.shared
-        return OutputPolicy(
-            overwriteSource: settings.overwriteSource,
-            onlyIfSmaller: settings.onlyIfSmaller,
-            deleteOriginalAfterConvert: settings.deleteOriginalAfterConvert,
-            isProportional: settings.isProportional,
-            customOutputFolder: settings.customOutputFolder.map { URL(fileURLWithPath: $0) }
-        )
-    }
 }
 
 /// Runs a batch selection over a set of files. Max 4 files in flight.
@@ -65,7 +55,7 @@ public enum ImageProcessor {
     public static func process(
         _ urls: [URL],
         _ selection: BatchSelection,
-        policy: OutputPolicy = .current,
+        policy: OutputPolicy,
         onProgress: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> ProcessingResult {
         let total = urls.count

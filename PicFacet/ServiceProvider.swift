@@ -21,8 +21,9 @@ final class ServiceProvider: NSObject {
         let urls = imageURLs(from: pboard)
         NSLog("[PicFacet] Service fired — %d image(s)", urls.count)
         guard !urls.isEmpty else { return }
+        let policy = PicFacetSettings.shared.outputPolicy
         Task {
-            let result = await ImageProcessor.process(urls, selection) { done, total in
+            let result = await ImageProcessor.process(urls, selection, policy: policy) { done, total in
                 NSLog("[PicFacet] progress %d/%d", done, total)
             }
             NSLog("[PicFacet] done — ok=%d failed=%d",

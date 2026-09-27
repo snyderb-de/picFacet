@@ -16,8 +16,13 @@ public final class PicFacetSettings: @unchecked Sendable {
 
     private static let appGroupID = "group.com.picfacet.shared"
 
-    private init() {
-        defaults = UserDefaults(suiteName: Self.appGroupID) ?? .standard
+    private convenience init() {
+        self.init(defaults: UserDefaults(suiteName: Self.appGroupID) ?? .standard)
+    }
+
+    /// Settings backed by any defaults store. Tests pass a scratch suite.
+    public init(defaults: UserDefaults) {
+        self.defaults = defaults
     }
 
     // MARK: - General
@@ -56,6 +61,17 @@ public final class PicFacetSettings: @unchecked Sendable {
     public var customOutputFolder: String? {
         get { defaults.string(forKey: Keys.customOutputFolder) }
         set { defaults.set(newValue, forKey: Keys.customOutputFolder) }
+    }
+
+    /// Snapshot of the output rules for one batch.
+    public var outputPolicy: OutputPolicy {
+        OutputPolicy(
+            overwriteSource: overwriteSource,
+            onlyIfSmaller: onlyIfSmaller,
+            deleteOriginalAfterConvert: deleteOriginalAfterConvert,
+            isProportional: isProportional,
+            customOutputFolder: customOutputFolder.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        )
     }
 
     // MARK: - Appearance

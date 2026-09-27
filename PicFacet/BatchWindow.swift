@@ -348,10 +348,11 @@ struct BatchView: View {
 
         guard let selection = draft.selection else { return }
         let summary = draft.summary
+        let policy = PicFacetSettings.shared.outputPolicy
         let urls = files.map { $0.url }
 
         Task {
-            let result = await ImageProcessor.process(urls, selection) { done, _ in
+            let result = await ImageProcessor.process(urls, selection, policy: policy) { done, _ in
                 currentProgress = done
             }
             handleCompletion(result, summary: summary)

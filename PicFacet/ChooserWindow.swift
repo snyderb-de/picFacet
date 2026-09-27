@@ -40,9 +40,10 @@ final class ChooserWindowController {
 
     private func run(draft: OperationDraft, urls: [URL]) {
         guard let selection = draft.selection else { return }
+        let policy = PicFacetSettings.shared.outputPolicy
 
         Task {
-            let r = await ImageProcessor.process(urls, selection) { d, t in
+            let r = await ImageProcessor.process(urls, selection, policy: policy) { d, t in
                 NSLog("[PicFacet] %d/%d", d, t)
             }
             NSLog("[PicFacet] done ok=%d failed=%d", r.succeeded.count, r.failed.count)
