@@ -277,7 +277,7 @@ struct BatchView: View {
                     .disabled(isProcessing)
                     }
 
-                    ResizeEntryRow(draft: $draft, labelWidth: 96)
+                    ResizeEntryRow(draft: $draft, showsLabel: false)
                         .padding(.leading, 68)
                 }
                 

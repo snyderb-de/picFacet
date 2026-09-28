@@ -150,6 +150,7 @@ struct PFChip: View {
 extension View {
     func pfPrimaryActionStyle() -> some View {
         self
+            .buttonSizing(.flexible)
             .frame(maxWidth: .infinity)
             .buttonStyle(.glassProminent)
             .controlSize(.large)

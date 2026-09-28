@@ -11,17 +11,24 @@ import PicFacetCore
 /// Shows nothing when the mode needs no value.
 struct ResizeEntryRow: View {
     @Binding var draft: OperationDraft
-    var labelWidth: CGFloat? = nil
+    /// Off where the picker right above already names the mode.
+    var showsLabel = true
+
+    /// Mirrors the draft's value. The draft filters input, and TextField keeps its
+    /// own editing text unless the bound value changes, so rejected characters are
+    /// pushed back here explicitly.
+    @State private var text = ""
 
     var body: some View {
         if let entry = draft.resizeMode.entry {
             HStack(spacing: 8) {
-                Text(entry.label)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(PFDesign.onSurfaceVariant)
-                    .frame(width: labelWidth, alignment: .leading)
+                if showsLabel {
+                    Text(entry.label)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(PFDesign.onSurfaceVariant)
+                }
 
-                TextField("Value", text: $draft.entryText)
+                TextField(entry.label, text: $text)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(PFDesign.onSurface)
@@ -32,6 +39,13 @@ struct ResizeEntryRow: View {
                     .overlay {
                         RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
                             .strokeBorder(draft.entryIsValid ? PFDesign.outlineVariant.opacity(0.2) : Color.red.opacity(0.55), lineWidth: 1)
+                    }
+                    .onChange(of: text) { _, newValue in
+                        draft.entryText = newValue
+                        if text != draft.entryText { text = draft.entryText }
+                    }
+                    .onChange(of: draft.resizeMode, initial: true) {
+                        text = draft.entryText
                     }
 
                 Text(entry.suffix)
