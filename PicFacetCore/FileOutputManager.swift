@@ -37,16 +37,26 @@ struct FileOutputManager {
         return candidate
     }
 
-    // MARK: - Guards
+    // MARK: - Staging
 
-    /// Returns true if the operation should be skipped per the "only if smaller" setting.
-    static func shouldSkip(originalSize: CGSize, newSize: CGSize, policy: OutputPolicy) -> Bool {
-        guard policy.onlyIfSmaller else { return false }
-        // Skip when the new dimensions are not smaller in at least one axis
-        return newSize.width >= CGFloat(1) &&
-               newSize.height >= CGFloat(1) &&
-               newSize.width >= originalSize.width &&
-               newSize.height >= originalSize.height
+    /// Hidden temp file in the output's folder, so committing it is a same-volume move.
+    static func stagingURL(for output: URL) -> URL {
+        output.deletingLastPathComponent()
+            .appendingPathComponent(".picfacet-\(UUID().uuidString)")
+            .appendingPathExtension(output.pathExtension)
+    }
+
+    /// Moves a staged file into place, replacing whatever is at `output`.
+    static func commit(_ staged: URL, to output: URL) throws {
+        if FileManager.default.fileExists(atPath: output.path) {
+            _ = try FileManager.default.replaceItemAt(output, withItemAt: staged)
+        } else {
+            try FileManager.default.moveItem(at: staged, to: output)
+        }
+    }
+
+    static func fileSize(_ url: URL) -> Int {
+        (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
     }
 
     // MARK: - Cleanup

@@ -100,12 +100,9 @@ public enum ImageProcessor {
         var needsWrite = selection.format != nil
 
         if let resize = selection.resize {
-            let originalSize = CGSize(width: image.width, height: image.height)
             let newSize = ResizeEngine.size(for: image, operation: resize, proportional: policy.isProportional)
-            if !FileOutputManager.shouldSkip(originalSize: originalSize, newSize: newSize, policy: policy) {
-                image = try ResizeEngine.resize(image, toSize: newSize)
-                needsWrite = true
-            }
+            image = try ResizeEngine.resize(image, toSize: newSize)
+            needsWrite = true
         }
 
         if let dpi = selection.dpi {
@@ -119,7 +116,20 @@ public enum ImageProcessor {
             FileOutputManager.outputURL(for: url, targetFormat: $0, policy: policy)
         } ?? FileOutputManager.outputURL(for: url, policy: policy)
 
-        try ConversionEngine.writeImage(image, properties: properties, to: output, format: targetFormat)
+        // Write beside the output first: the source must survive until the
+        // size check passes, even when the output replaces it.
+        let staged = FileOutputManager.stagingURL(for: output)
+        defer { try? FileManager.default.removeItem(at: staged) }
+        try ConversionEngine.writeImage(image, properties: properties, to: staged, format: targetFormat)
+
+        // DPI-only edits are metadata changes, so the size rule does not apply.
+        let changesPixelsOrFormat = selection.format != nil || selection.resize != nil
+        if policy.onlyIfSmaller && changesPixelsOrFormat
+            && FileOutputManager.fileSize(staged) >= FileOutputManager.fileSize(url) {
+            return url
+        }
+
+        try FileOutputManager.commit(staged, to: output)
 
         if selection.format != nil && output.path != url.path {
             FileOutputManager.deleteOriginal(url, policy: policy)

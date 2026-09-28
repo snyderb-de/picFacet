@@ -108,8 +108,8 @@ struct SettingsView: View {
                 .onChange(of: overwriteSource) { _, new in PicFacetSettings.shared.overwriteSource = new }
 
                 Toggle(isOn: $onlyIfSmaller) {
-                    Text("Keep converted file only if smaller")
-                    Text("Discard the new file when it isn't a size win.")
+                    Text("Keep result only if smaller")
+                    Text("Discard a converted or resized file when it isn't smaller than the original. DPI-only changes are always kept.")
                 }
                 .onChange(of: onlyIfSmaller) { _, new in PicFacetSettings.shared.onlyIfSmaller = new }
 
@@ -129,6 +129,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .tint(PFDesign.primary)
         .frame(width: 580, height: 680)
     }
 

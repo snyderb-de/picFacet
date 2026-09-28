@@ -14,7 +14,7 @@ import Testing
 
     // MARK: - Fixtures
 
-    private func makeImage(named name: String, width: Int = 200, height: Int = 100) throws -> URL {
+    private func makeImage(named name: String, width: Int = 200, height: Int = 100, noisy: Bool = false) throws -> URL {
         let url = dir.appendingPathComponent(name)
         let ctx = CGContext(
             data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
@@ -23,6 +23,13 @@ import Testing
         )!
         ctx.setFillColor(red: 0.2, green: 0.4, blue: 0.8, alpha: 1)
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        if noisy {
+            var rng = SystemRandomNumberGenerator()
+            for x in 0..<width { for y in 0..<height where Bool.random(using: &rng) {
+                ctx.setFillColor(red: .random(in: 0...1), green: .random(in: 0...1), blue: .random(in: 0...1), alpha: 1)
+                ctx.fill(CGRect(x: x, y: y, width: 1, height: 1))
+            } }
+        }
         let format = ImageFormat(fileExtension: url.pathExtension)!
         try ConversionEngine.writeImage(ctx.makeImage()!, properties: [:], to: url, format: format)
         return url
@@ -85,14 +92,45 @@ import Testing
         #expect(try pixelSize(source) == (50, 25))
     }
 
-    @Test func onlyIfSmallerSkipsUpscale() async throws {
-        let source = try makeImage(named: "photo.png")
+    @Test func onlyIfSmallerKeepsSmallerFile() async throws {
+        let source = try makeImage(named: "photo.png", noisy: true)
 
-        let result = await ImageProcessor.process([source], BatchSelection(resize: .percent(200)),
+        let result = await ImageProcessor.process([source], BatchSelection(resize: .percent(25)),
                                                   policy: OutputPolicy(onlyIfSmaller: true))
 
+        #expect(result.succeeded == [dir.appendingPathComponent("photo-picfacet.png")])
+        #expect(try files() == ["photo-picfacet.png", "photo.png"])
+    }
+
+    @Test func onlyIfSmallerDiscardsLargerFile() async throws {
+        // A flat-colour PNG compresses far better than uncompressed TIFF
+        let source = try makeImage(named: "photo.png")
+
+        let result = await ImageProcessor.process([source], BatchSelection(format: .tiff),
+                                                  policy: OutputPolicy(onlyIfSmaller: true, deleteOriginalAfterConvert: true))
+
         #expect(result.succeeded == [source])
+        #expect(try files() == ["photo.png"]) // no output, no staging file, original kept
+    }
+
+    @Test func onlyIfSmallerNeverTouchesSourceWhenOverwriting() async throws {
+        let source = try makeImage(named: "photo.png")
+        let before = try Data(contentsOf: source)
+
+        _ = await ImageProcessor.process([source], BatchSelection(resize: .percent(300)),
+                                         policy: OutputPolicy(overwriteSource: true, onlyIfSmaller: true))
+
+        #expect(try Data(contentsOf: source) == before)
         #expect(try files() == ["photo.png"])
+    }
+
+    @Test func onlyIfSmallerIgnoresDpiOnlyChanges() async throws {
+        let source = try makeImage(named: "photo.png")
+
+        let result = await ImageProcessor.process([source], BatchSelection(dpi: 300),
+                                                  policy: OutputPolicy(onlyIfSmaller: true))
+
+        #expect(result.succeeded == [dir.appendingPathComponent("photo-picfacet.png")])
     }
 
     @Test func deleteOriginalAfterConvert() async throws {
