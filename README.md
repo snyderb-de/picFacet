@@ -123,7 +123,10 @@ You should see `[PicFacet] Service fired — N image(s)` after each click.
 ├── project.yml            ← xcodegen config (source of truth)
 ├── .gitignore
 ├── PicFacet/              ← main app sources, Info.plist, entitlements
-└── PicFacetCore/          ← framework sources + Info.plist
+├── PicFacetCore/          ← framework sources + Info.plist
+├── PicFacetCoreTests/     ← Swift Testing suite (runs spec/cases.json too)
+├── spec/cases.json        ← platform-neutral behaviour cases
+└── docs/roadmap/          ← parked future features
 ```
 
 `PicFacet.xcodeproj/` and `build/` are gitignored. **Always re-run `xcodegen generate` after adding or removing source files.**
@@ -136,17 +139,17 @@ You should see `[PicFacet] Service fired — N image(s)` after each click.
 - [x] Phase 2 — Image engine (convert/resize/DPI, all formats incl. HEIC)
 - [x] Phase 3 — NSServices Quick Actions (14 ops + chooser)
 - [x] Phase 3.5 — full chooser window + onboarding
-- [ ] Phase 4 — Custom input panels (partial: engine supports max width/height; UI still needs custom inputs)
+- [x] Phase 4 — Custom input panels (custom %, target width, target height in Chooser and Batch)
 - [ ] Phase 5 — Menu bar progress indicator
 - [x] Phase 6 — Full settings window
 - [ ] Phase 7 — App icon, DMG, notarization
 - [ ] Phase 8 — Pricing research ($1.99–$2.99 target)
 - [ ] Phase 9 — Mac App Store submission
+- [ ] Future — Windows release (parked; see [docs/roadmap/windows-port.md](docs/roadmap/windows-port.md))
 
 ## Current Gaps
 
 - Verify Finder Quick Actions end-to-end after each generated build.
-- Add custom resize inputs: percent, max width, max height, proportional toggle.
 - Add menu bar progress while batches are running.
 - Replace the generated/menu-bar symbol with final app icon assets.
 - Prepare packaging, signing, notarization, and Mac App Store metadata.

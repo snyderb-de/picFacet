@@ -1,0 +1,112 @@
+{
+  "about": "Platform-neutral behaviour cases for PicFacet. The macOS test suite runs every case here (PicFacetCoreTests/SharedSpecTests.swift); a Windows port must pass the same file. See docs/roadmap/windows-port.md.",
+
+  "serviceCommands": {
+    "valid": [
+      { "command": "convert:jpeg", "selection": { "format": "jpeg" } },
+      { "command": "convert:HEIC", "selection": { "format": "heic" } },
+      { "command": "resize:50%", "selection": { "resize": { "percent": 50 } } },
+      { "command": "width:800", "selection": { "resize": { "width": 800 } } },
+      { "command": "height:600", "selection": { "resize": { "height": 600 } } },
+      { "command": "dpi:300", "selection": { "dpi": 300 } },
+      { "command": "convert:png;resize:25%;dpi:72", "selection": { "format": "png", "resize": { "percent": 25 }, "dpi": 72 } },
+      { "command": " convert : webp ", "selection": { "format": "webp" } }
+    ],
+    "invalid": ["", "convert", "convert:psd", "resize:50", "resize:0%", "width:-1", "dpi:abc", "rotate:90", "convert:png;bogus"]
+  },
+
+  "pipeline": [
+    {
+      "name": "chained steps write exactly one file",
+      "source": { "name": "photo.jpg", "width": 200, "height": 100 },
+      "selection": { "format": "png", "resize": { "percent": 50 }, "dpi": 300 },
+      "policy": {},
+      "expect": { "files": ["photo.jpg", "photo.png"], "result": "photo.png", "pixels": [100, 50], "dpi": 300 }
+    },
+    {
+      "name": "dpi is written for png",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "dpi": 300 }, "policy": {},
+      "expect": { "result": "photo-picfacet.png", "dpi": 300 }
+    },
+    {
+      "name": "dpi is written for jpeg",
+      "source": { "name": "photo.jpg", "width": 200, "height": 100 },
+      "selection": { "dpi": 300 }, "policy": {},
+      "expect": { "result": "photo-picfacet.jpg", "dpi": 300 }
+    },
+    {
+      "name": "dpi is written for tiff",
+      "source": { "name": "photo.tif", "width": 200, "height": 100 },
+      "selection": { "dpi": 300 }, "policy": {},
+      "expect": { "result": "photo-picfacet.tif", "dpi": 300 }
+    },
+    {
+      "name": "dpi is written for heic",
+      "source": { "name": "photo.heic", "width": 200, "height": 100 },
+      "selection": { "dpi": 300 }, "policy": {},
+      "expect": { "result": "photo-picfacet.heic", "dpi": 300 }
+    },
+    {
+      "name": "in-place resize writes a suffixed copy",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "resize": { "width": 50 } }, "policy": {},
+      "expect": { "files": ["photo-picfacet.png", "photo.png"], "result": "photo-picfacet.png", "pixels": [50, 25] }
+    },
+    {
+      "name": "non-proportional width keeps height",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "resize": { "width": 50 } }, "policy": { "isProportional": false },
+      "expect": { "result": "photo-picfacet.png", "pixels": [50, 100] }
+    },
+    {
+      "name": "overwrite source replaces the file",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "resize": { "percent": 25 } }, "policy": { "overwriteSource": true },
+      "expect": { "files": ["photo.png"], "result": "photo.png", "pixels": [50, 25] }
+    },
+    {
+      "name": "convert never overwrites an existing output unless overwriting",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "existing": ["photo.jpg"],
+      "selection": { "format": "jpeg" }, "policy": {},
+      "expect": { "files": ["photo-1.jpg", "photo.jpg", "photo.png"], "result": "photo-1.jpg" }
+    },
+    {
+      "name": "only-if-smaller keeps a smaller file",
+      "source": { "name": "photo.png", "width": 200, "height": 100, "noisy": true },
+      "selection": { "resize": { "percent": 25 } }, "policy": { "onlyIfSmaller": true },
+      "expect": { "files": ["photo-picfacet.png", "photo.png"], "result": "photo-picfacet.png" }
+    },
+    {
+      "name": "only-if-smaller discards a larger file and keeps the original",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "format": "tiff" }, "policy": { "onlyIfSmaller": true, "deleteOriginalAfterConvert": true },
+      "expect": { "files": ["photo.png"], "result": "photo.png", "sourceUnchanged": true }
+    },
+    {
+      "name": "only-if-smaller never touches the source when overwriting",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "resize": { "percent": 300 } }, "policy": { "overwriteSource": true, "onlyIfSmaller": true },
+      "expect": { "files": ["photo.png"], "result": "photo.png", "sourceUnchanged": true }
+    },
+    {
+      "name": "only-if-smaller ignores dpi-only changes",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "dpi": 300 }, "policy": { "onlyIfSmaller": true },
+      "expect": { "result": "photo-picfacet.png", "dpi": 300 }
+    },
+    {
+      "name": "delete original after convert",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "format": "jpeg" }, "policy": { "deleteOriginalAfterConvert": true },
+      "expect": { "files": ["photo.jpg"], "result": "photo.jpg" }
+    },
+    {
+      "name": "custom output folder",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "dpi": 150 }, "policy": { "customOutputFolder": "out" },
+      "expect": { "files": ["out/photo.png", "photo.png"], "result": "out/photo.png", "dpi": 150 }
+    }
+  ]
+}
