@@ -41,7 +41,7 @@ PicFacet.xcodeproj           (generated — gitignored)
 ├── PicFacet                 (main app, menu-bar resident, LSUIElement)
 │   ├── PicFacetApp.swift
 │   ├── AppDelegate.swift          — registers NSApp.servicesProvider
-│   ├── ServiceProvider.swift      — @objc handlers for every Quick Action
+│   ├── ServiceProvider.swift      — two @objc entry points; NSUserData picks the operation
 │   ├── ChooserWindow.swift        — full picker window for "PicFacet…"
 │   ├── BatchWindow.swift          — drag-and-drop batch processor
 │   ├── PicFacetDesign.swift       — PFDesign tokens + Liquid Glass modifiers

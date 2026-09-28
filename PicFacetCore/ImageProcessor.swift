@@ -127,3 +127,51 @@ public enum ImageProcessor {
         return output
     }
 }
+
+// MARK: - Service commands
+
+public extension BatchSelection {
+    /// Parses the `NSUserData` string of a Finder service entry.
+    ///
+    /// Steps are separated by `;` and may be combined:
+    /// `convert:<format>`, `resize:<n>%`, `width:<n>`, `height:<n>`, `dpi:<n>`.
+    /// Example: `convert:png;resize:50%;dpi:300`. Returns nil when any step is
+    /// malformed or nothing is selected.
+    init?(serviceCommand: String) {
+        var selection = BatchSelection()
+        for step in serviceCommand.split(separator: ";") {
+            let parts = step.split(separator: ":", maxSplits: 1).map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
+            guard parts.count == 2 else { return nil }
+            let (verb, value) = (parts[0].lowercased(), parts[1])
+
+            func positive(_ text: String) -> Int? {
+                guard let n = Int(text), n > 0 else { return nil }
+                return n
+            }
+
+            switch verb {
+            case "convert":
+                guard let format = ImageFormat(fileExtension: value) else { return nil }
+                selection.format = format
+            case "resize":
+                guard value.hasSuffix("%"), let n = positive(String(value.dropLast())) else { return nil }
+                selection.resize = .percent(n)
+            case "width":
+                guard let n = positive(value) else { return nil }
+                selection.resize = .width(n)
+            case "height":
+                guard let n = positive(value) else { return nil }
+                selection.resize = .height(n)
+            case "dpi":
+                guard let n = positive(value) else { return nil }
+                selection.dpi = n
+            default:
+                return nil
+            }
+        }
+        guard selection.hasSelection else { return nil }
+        self = selection
+    }
+}

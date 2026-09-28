@@ -45,7 +45,8 @@
         <!-- Convert -->
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Convert to JPEG</string></dict>
-            <key>NSMessage</key><string>convertToJPEG</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>convert:jpeg</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key>
             <array>
@@ -55,37 +56,43 @@
         </dict>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Convert to PNG</string></dict>
-            <key>NSMessage</key><string>convertToPNG</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>convert:png</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Convert to WebP</string></dict>
-            <key>NSMessage</key><string>convertToWebP</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>convert:webp</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Convert to TIFF</string></dict>
-            <key>NSMessage</key><string>convertToTIFF</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>convert:tiff</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Convert to GIF</string></dict>
-            <key>NSMessage</key><string>convertToGIF</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>convert:gif</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Convert to BMP</string></dict>
-            <key>NSMessage</key><string>convertToBMP</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>convert:bmp</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Convert to HEIC</string></dict>
-            <key>NSMessage</key><string>convertToHEIC</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>convert:heic</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
@@ -93,19 +100,22 @@
         <!-- Resize -->
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Resize 25%</string></dict>
-            <key>NSMessage</key><string>resize25</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>resize:25%</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Resize 50%</string></dict>
-            <key>NSMessage</key><string>resize50</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>resize:50%</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Resize 75%</string></dict>
-            <key>NSMessage</key><string>resize75</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>resize:75%</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
@@ -113,25 +123,29 @@
         <!-- DPI -->
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Set DPI 72</string></dict>
-            <key>NSMessage</key><string>dpi72</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>dpi:72</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Set DPI 150</string></dict>
-            <key>NSMessage</key><string>dpi150</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>dpi:150</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Set DPI 300</string></dict>
-            <key>NSMessage</key><string>dpi300</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>dpi:300</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
         <dict>
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Set DPI 600</string></dict>
-            <key>NSMessage</key><string>dpi600</string>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>dpi:600</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>

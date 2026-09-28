@@ -3,7 +3,7 @@ import PicFacetCore
 
 /// Handles NSServices / Quick Actions invoked from Finder's right-click menu.
 ///
-/// Each @objc method matches an `NSMessage` entry in Info.plist's NSServices array.
+/// Two @objc entry points match the `NSMessage` values in Info.plist's NSServices array.
 /// macOS passes the selected files via the pasteboard as file URLs; we decode,
 /// filter for images, and hand off to ImageProcessor.
 final class ServiceProvider: NSObject {
@@ -46,54 +46,16 @@ final class ServiceProvider: NSObject {
         }
     }
 
-    // MARK: - Convert
+    // MARK: - Direct actions
 
-    @objc func convertToJPEG(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(format: .jpeg))
-    }
-    @objc func convertToPNG(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(format: .png))
-    }
-    @objc func convertToWebP(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(format: .webp))
-    }
-    @objc func convertToTIFF(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(format: .tiff))
-    }
-    @objc func convertToGIF(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(format: .gif))
-    }
-    @objc func convertToBMP(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(format: .bmp))
-    }
-    @objc func convertToHEIC(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(format: .heic))
-    }
-
-    // MARK: - Resize presets
-
-    @objc func resize25(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(resize: .percent(25)))
-    }
-    @objc func resize50(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(resize: .percent(50)))
-    }
-    @objc func resize75(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(resize: .percent(75)))
-    }
-
-    // MARK: - DPI presets
-
-    @objc func dpi72(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(dpi: 72))
-    }
-    @objc func dpi150(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(dpi: 150))
-    }
-    @objc func dpi300(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(dpi: 300))
-    }
-    @objc func dpi600(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
-        run(pboard, BatchSelection(dpi: 600))
+    /// Every non-chooser entry in Info.plist's NSServices sends this message;
+    /// its NSUserData names the operation (see `BatchSelection(serviceCommand:)`).
+    @objc func picFacetRun(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        guard let userData, let selection = BatchSelection(serviceCommand: userData) else {
+            NSLog("[PicFacet] Unknown service command: %@", userData ?? "nil")
+            error.pointee = "PicFacet does not recognise this action." as NSString
+            return
+        }
+        run(pboard, selection)
     }
 }
