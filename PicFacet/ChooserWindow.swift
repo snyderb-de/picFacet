@@ -9,10 +9,7 @@ final class ChooserWindowController {
     private var window: NSWindow?
 
     func show(urls: [URL]) {
-        let root = ChooserView(urls: urls, onCancel: { [weak self] in
-            self?.close()
-        }) { [weak self] draft in
-            self?.run(draft: draft, urls: urls)
+        let root = ChooserView(urls: urls) { [weak self] in
             self?.close()
         }
         if window == nil {
@@ -25,8 +22,8 @@ final class ChooserWindowController {
             win.isReleasedWhenClosed = false
             win.level = .floating
             win.backgroundColor = NSColor(PFDesign.canvas)
-            win.setContentSize(NSSize(width: 980, height: 700))
-            win.minSize = NSSize(width: 900, height: 640)
+            win.setContentSize(NSSize(width: 900, height: 600))
+            win.minSize = NSSize(width: 820, height: 560)
             win.center()
             window = win
         } else {
@@ -37,36 +34,19 @@ final class ChooserWindowController {
     }
 
     private func close() { window?.orderOut(nil) }
-
-    private func run(draft: OperationDraft, urls: [URL]) {
-        guard let selection = draft.selection else { return }
-        let policy = PicFacetSettings.shared.outputPolicy
-
-        Task {
-            let r = await ImageProcessor.process(urls, selection, policy: policy) { d, t in
-                NSLog("[PicFacet] %d/%d", d, t)
-            }
-            NSLog("[PicFacet] done ok=%d failed=%d", r.succeeded.count, r.failed.count)
-            CompletionAlert.show(r, summary: draft.summary)
-        }
-    }
 }
 
 // MARK: - View
 
 struct ChooserView: View {
     let urls: [URL]
-    let onCancel: () -> Void
-    let onPick: (OperationDraft) -> Void
+    /// Closes the window: on Cancel, or after a run and its alert.
+    let onClose: () -> Void
 
     @State private var draft = OperationDraft.defaults()
     @State private var thumbnails: [URL: NSImage] = [:]
-
-    init(urls: [URL], onCancel: @escaping () -> Void, onPick: @escaping (OperationDraft) -> Void) {
-        self.urls = urls
-        self.onCancel = onCancel
-        self.onPick = onPick
-    }
+    /// (completed, total) while a run is in progress.
+    @State private var progress: (completed: Int, total: Int)?
 
     var fileCount: Int { urls.count }
 
@@ -89,7 +69,6 @@ struct ChooserView: View {
         return ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
     }
 
-    private var hasSelection: Bool { draft.format != nil || draft.resize != nil || draft.dpi != nil }
     private var canStart: Bool { draft.selection != nil }
 
     var body: some View {
@@ -98,27 +77,14 @@ struct ChooserView: View {
         }
         .padding(30)
         .frame(
-            minWidth: 900,
-            idealWidth: 980,
+            minWidth: 820,
+            idealWidth: 900,
             maxWidth: .infinity,
-            minHeight: 640,
-            idealHeight: 700,
+            minHeight: 560,
+            idealHeight: 600,
             maxHeight: .infinity
         )
-        .background {
-            ZStack {
-                PFDesign.canvas
-                LinearGradient(
-                    colors: [
-                        PFDesign.primary.opacity(0.10),
-                        PFDesign.success.opacity(0.05),
-                        Color.clear
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-        }
+        .background { PFDesign.backdrop }
         .onAppear {
             loadThumbnails()
         }
@@ -182,7 +148,7 @@ struct ChooserView: View {
             .frame(maxHeight: .infinity)
         }
         .padding(18)
-        .pfPanel()
+        .pfContentPanel()
     }
 
     private var heroPreview: some View {
@@ -305,145 +271,54 @@ struct ChooserView: View {
             HStack {
                 PFSectionLabel(text: "Processing Options")
                 Spacer()
-                Text("Format -> Resize -> DPI")
+                Text("Format → Resize → DPI")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(PFDesign.onSurfaceVariant)
             }
 
-            VStack(alignment: .leading, spacing: 9) {
-                optionLabel("Format", detail: "Output file type")
-                FlowLayout(spacing: 8) {
-                    PFChip(title: "Leave as-is", isSelected: draft.format == nil) {
-                        draft.format = nil
-                    }
-                    ForEach(ImageFormat.allCases, id: \.self) { fmt in
-                        PFChip(title: fmt.displayName, isSelected: draft.format == fmt, systemImage: formatIcon(for: fmt)) {
-                            draft.format = fmt
-                        }
-                    }
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 9) {
-                optionLabel("Resize", detail: "Scale or constrain dimensions")
-                FlowLayout(spacing: 8) {
-                    ForEach(ResizeMode.allCases, id: \.self) { mode in
-                        PFChip(title: mode.title, isSelected: draft.resizeMode == mode, systemImage: mode.systemImage) {
-                            draft.resizeMode = mode
-                        }
-                    }
-                }
-
-                ResizeEntryRow(draft: $draft)
-                    .padding(.top, 2)
-            }
-
-            VStack(alignment: .leading, spacing: 9) {
-                optionLabel("DPI", detail: "Print-resolution metadata")
-                FlowLayout(spacing: 8) {
-                    PFChip(title: "Leave as-is", isSelected: draft.dpi == nil) {
-                        draft.dpi = nil
-                    }
-                    ForEach(PicFacetSettings.dpiOptions, id: \.self) { d in
-                        PFChip(title: "\(d)", isSelected: draft.dpi == d, systemImage: dpiIcon(for: d)) {
-                            draft.dpi = d
-                        }
-                    }
-                }
-            }
+            OperationMenus(draft: $draft, labelWidth: 170, menuWidth: 220, showsDetails: true)
+                .disabled(isRunning)
         }
     }
 
-    private func optionLabel(_ title: String, detail: String) -> some View {
-        HStack(alignment: .center, spacing: 8) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(PFDesign.onSurface)
-            Text(detail)
-                .font(.system(size: 11))
-                .foregroundStyle(PFDesign.onSurfaceVariant)
-        }
-    }
+    private var isRunning: Bool { progress != nil }
 
     private var summaryBar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: canStart ? "checkmark.circle.fill" : "circle.dashed")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(canStart ? PFDesign.success : PFDesign.onSurfaceVariant)
-            Text(draft.summary)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(hasSelection ? PFDesign.onSurface : PFDesign.onSurfaceVariant)
-                .lineLimit(2)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
-        .background(PFDesign.surfaceLow, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder((canStart ? PFDesign.success : PFDesign.outlineVariant).opacity(0.18), lineWidth: 1)
-        }
+        PFRunBar(summary: draft.summary, isReady: canStart, progress: progress)
     }
 
     private var actionBar: some View {
         HStack(spacing: 12) {
-            Button("Cancel", action: onCancel)
+            Button("Cancel", action: onClose)
                 .pfSecondaryActionStyle()
+                .disabled(isRunning)
 
             Button {
-                onPick(draft)
+                start()
             } label: {
-                Label("Start Processing", systemImage: "sparkles")
+                Label(isRunning ? "Processing…" : "Start Processing", systemImage: "sparkles")
             }
             .pfPrimaryActionStyle()
-            .disabled(!canStart)
+            .disabled(!canStart || isRunning)
         }
         .padding(.top, 4)
     }
 
-    private func formatIcon(for format: ImageFormat) -> String {
-        switch format {
-        case .jpeg, .png, .heic, .webp: return "photo"
-        case .tiff, .bmp: return "doc.richtext"
-        case .gif: return "play.rectangle"
-        }
-    }
+    private func start() {
+        guard let selection = draft.selection else { return }
+        let summary = draft.summary
+        let policy = PicFacetSettings.shared.outputPolicy
+        progress = (0, urls.count)
 
-    private func dpiIcon(for dpi: Int) -> String {
-        dpi >= 600 ? "printer.filled.and.paper" : "printer"
-    }
-}
-
-// MARK: - Tiny flow layout (chips wrap to next row)
-
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
-        for sub in subviews {
-            let s = sub.sizeThatFits(.unspecified)
-            if x + s.width > maxWidth {
-                x = 0; y += rowHeight + spacing; rowHeight = 0
+        Task {
+            let result = await ImageProcessor.process(urls, selection, policy: policy) { p in
+                progress = (p.completed, p.total)
             }
-            x += s.width + spacing
-            rowHeight = max(rowHeight, s.height)
-        }
-        return CGSize(width: maxWidth, height: y + rowHeight)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX, y = bounds.minY, rowHeight: CGFloat = 0
-        for sub in subviews {
-            let s = sub.sizeThatFits(.unspecified)
-            if x + s.width > bounds.maxX {
-                x = bounds.minX; y += rowHeight + spacing; rowHeight = 0
-            }
-            sub.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(s))
-            x += s.width + spacing
-            rowHeight = max(rowHeight, s.height)
+            NSLog("[PicFacet] done ok=%d kept=%d failed=%d",
+                  result.succeeded.count, result.keptOriginal.count, result.failed.count)
+            try? await Task.sleep(for: .milliseconds(700))  // let the fill land
+            CompletionAlert.show(result, summary: summary)
+            onClose()
         }
     }
 }

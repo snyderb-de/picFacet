@@ -51,6 +51,7 @@ struct BatchView: View {
     @State private var isDraggingOver = false
     
     @State private var draft = OperationDraft.defaults()
+    @State private var activity: [ActivityRun] = []
 
     init(initialFiles: [URL]) {
         _files = State(initialValue: initialFiles.map { FileItem(url: $0) })
@@ -69,20 +70,7 @@ struct BatchView: View {
             idealHeight: 680,
             maxHeight: .infinity
         )
-        .background {
-            ZStack {
-                PFDesign.canvas
-                LinearGradient(
-                    colors: [
-                        PFDesign.primary.opacity(0.10),
-                        PFDesign.success.opacity(0.04),
-                        Color.clear
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-        }
+        .background { PFDesign.backdrop }
         .onDrop(of: [.fileURL], isTargeted: $isDraggingOver) { providers in
             handleDrop(providers: providers)
         }
@@ -101,8 +89,14 @@ struct BatchView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            controlsView
-                .frame(width: 310)
+            VStack(spacing: 22) {
+                controlsView
+                ActivityLogView(runs: activity) { activity.removeAll() }
+                    .padding(22)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .pfPanel()
+            }
+            .frame(width: 310)
         }
     }
     
@@ -158,27 +152,28 @@ struct BatchView: View {
                     .foregroundStyle(PFDesign.onSurfaceVariant)
             }
             
-            Button("Select Files...") {
+            Button("Select Files…") {
                 selectFiles()
             }
-            .pfSecondaryActionStyle()
+            .buttonStyle(.glassProminent)
+            .controlSize(.large)
+            .tint(PFDesign.primary)
             .padding(.top, 8)
             
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: PFDesign.rPanel, style: .continuous)
+                .fill(isDraggingOver ? PFDesign.primary.opacity(0.08) : PFDesign.surfaceLowest.opacity(0.5))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: PFDesign.rPanel, style: .continuous)
                 .strokeBorder(
-                    isDraggingOver ? PFDesign.primary : PFDesign.outlineVariant.opacity(0.3),
-                    style: StrokeStyle(lineWidth: 2, dash: [8, 4])
-                )
-                .background(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(isDraggingOver ? PFDesign.primary.opacity(0.05) : Color.clear)
+                    isDraggingOver ? PFDesign.primary : PFDesign.outlineVariant.opacity(0.55),
+                    style: StrokeStyle(lineWidth: 1.5, dash: [7, 5])
                 )
         }
-        .pfPanel()
         .animation(.easeInOut(duration: 0.2), value: isDraggingOver)
     }
     
@@ -215,15 +210,10 @@ struct BatchView: View {
                     }
                 }
             }
-            
-            // Progress indicator (when processing)
-            if isProcessing {
-                PFProgressView(current: currentProgress, total: files.count)
-                    .padding(.top, 14)
-            }
+
         }
         .padding(18)
-        .pfPanel()
+        .pfContentPanel()
     }
     
     // MARK: - Controls
@@ -239,67 +229,15 @@ struct BatchView: View {
                         .foregroundStyle(PFDesign.primary)
                 }
                 
-                // Format picker
-                HStack {
-                    Text("Format")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(PFDesign.onSurfaceVariant)
-                        .frame(width: 60, alignment: .leading)
-                    
-                    Picker("", selection: $draft.format) {
-                        Text("Leave as-is").tag(nil as ImageFormat?)
-                        ForEach(ImageFormat.allCases, id: \.self) { format in
-                            Text(format.displayName).tag(Optional(format))
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity)
+                OperationMenus(draft: $draft)
                     .disabled(isProcessing)
-                }
-                
-                // Resize picker
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                    Text("Resize")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(PFDesign.onSurfaceVariant)
-                        .frame(width: 60, alignment: .leading)
-                    
-                    Picker("", selection: $draft.resizeMode) {
-                        ForEach(ResizeMode.allCases, id: \.self) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity)
-                    .disabled(isProcessing)
-                    }
 
-                    ResizeEntryRow(draft: $draft, showsLabel: false)
-                        .padding(.leading, 68)
-                }
-                
-                // DPI picker
-                HStack {
-                    Text("DPI")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(PFDesign.onSurfaceVariant)
-                        .frame(width: 60, alignment: .leading)
-                    
-                    Picker("", selection: $draft.dpi) {
-                        Text("Leave as-is").tag(nil as Int?)
-                        ForEach(PicFacetSettings.dpiOptions, id: \.self) { dpi in
-                            Text("\(dpi) DPI").tag(Optional(dpi))
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity)
-                    .disabled(isProcessing)
-                }
-                
+                PFRunBar(
+                    summary: draft.summary,
+                    isReady: draft.selection != nil,
+                    progress: isProcessing ? (currentProgress, files.count) : nil
+                )
+
                 // Start button
                 Button {
                     startProcessing()
@@ -351,10 +289,18 @@ struct BatchView: View {
         let policy = PicFacetSettings.shared.outputPolicy
         let urls = files.map { $0.url }
 
+        let run = ActivityRun(summary: selection.summary)
+        activity.insert(run, at: 0)
+
         Task {
-            let result = await ImageProcessor.process(urls, selection, policy: policy) { done, _ in
-                currentProgress = done
+            let result = await ImageProcessor.process(urls, selection, policy: policy) { progress in
+                currentProgress = progress.completed
+                // Looked up by id: the log may have been cleared mid-run.
+                if let index = activity.firstIndex(where: { $0.id == run.id }) {
+                    activity[index].reports.insert(progress.latest, at: 0)
+                }
             }
+            try? await Task.sleep(for: .milliseconds(700))  // let the fill land
             handleCompletion(result, summary: summary)
         }
     }

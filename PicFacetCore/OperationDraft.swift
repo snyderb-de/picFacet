@@ -16,7 +16,7 @@ public enum ResizeMode: Hashable, Sendable, CaseIterable {
 
     public var title: String {
         switch self {
-        case .none: return "Leave as-is"
+        case .none: return "No Change"
         case .percent(let percent): return "\(percent)%"
         case .customPercent: return "Custom %"
         case .width: return "Set width"
@@ -65,10 +65,12 @@ public struct OperationDraft: Equatable, Sendable {
 
     /// Starting point from the user's saved defaults.
     public static func defaults(from settings: PicFacetSettings = .shared) -> OperationDraft {
-        let percent = settings.defaultResizePercent
+        let resizeMode: ResizeMode = settings.defaultResizePercent.map {
+            .percent(ResizeMode.presetPercents.contains($0) ? $0 : 50)
+        } ?? .none
         return OperationDraft(
             format: settings.defaultFormat,
-            resizeMode: .percent(ResizeMode.presetPercents.contains(percent) ? percent : 50),
+            resizeMode: resizeMode,
             dpi: settings.defaultDPI
         )
     }
@@ -103,11 +105,8 @@ public struct OperationDraft: Equatable, Sendable {
 
     public var summary: String {
         guard entryIsValid else { return "Enter a positive resize value to continue." }
-        var parts: [String] = []
-        if let format { parts.append("Convert to \(format.displayName)") }
-        if let resize { parts.append(resize.displayName) }
-        if let dpi { parts.append("Set \(dpi) DPI") }
-        return parts.isEmpty ? "Choose at least one operation to continue." : parts.joined(separator: " + ")
+        let selection = BatchSelection(format: format, resize: resize, dpi: dpi)
+        return selection.hasSelection ? selection.summary : "Choose at least one operation to continue."
     }
 
     private var positiveEntry: Int? {

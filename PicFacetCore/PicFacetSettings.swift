@@ -89,25 +89,46 @@ public final class PicFacetSettings: @unchecked Sendable {
     
     // MARK: - Defaults
     
-    public var defaultFormat: ImageFormat {
+    // nil means "No Change". It is stored as a sentinel ("none" / 0) so that
+    // it differs from a missing key, which falls back to the shipped default.
+
+    public var defaultFormat: ImageFormat? {
         get {
-            guard let rawValue = defaults.string(forKey: Keys.defaultFormat),
-                  let format = ImageFormat(rawValue: rawValue) else {
-                return .jpeg
-            }
-            return format
+            guard let rawValue = defaults.string(forKey: Keys.defaultFormat) else { return .jpeg }
+            return ImageFormat(rawValue: rawValue)
         }
-        set { defaults.set(newValue.rawValue, forKey: Keys.defaultFormat) }
+        set { defaults.set(newValue?.rawValue ?? Self.noChange, forKey: Keys.defaultFormat) }
     }
-    
-    public var defaultResizePercent: Int {
-        get { defaults.object(forKey: Keys.defaultResizePercent) as? Int ?? 50 }
-        set { defaults.set(newValue, forKey: Keys.defaultResizePercent) }
+
+    public var defaultResizePercent: Int? {
+        get { positive(Keys.defaultResizePercent, fallback: 50) }
+        set { defaults.set(newValue ?? 0, forKey: Keys.defaultResizePercent) }
     }
-    
-    public var defaultDPI: Int {
-        get { defaults.object(forKey: Keys.defaultDPI) as? Int ?? 72 }
-        set { defaults.set(newValue, forKey: Keys.defaultDPI) }
+
+    public var defaultDPI: Int? {
+        get { positive(Keys.defaultDPI, fallback: 72) }
+        set { defaults.set(newValue ?? 0, forKey: Keys.defaultDPI) }
+    }
+
+    private static let noChange = "none"
+
+    private func positive(_ key: String, fallback: Int) -> Int? {
+        guard let value = defaults.object(forKey: key) as? Int else { return fallback }
+        return value > 0 ? value : nil
+    }
+
+    // MARK: - Theme
+
+    /// Accent colour: a preset name ("blue", "system", …) or "#RRGGBB".
+    public var accentColor: String {
+        get { defaults.string(forKey: Keys.accentColor) ?? "blue" }
+        set { defaults.set(newValue, forKey: Keys.accentColor) }
+    }
+
+    /// Window background: a preset name ("accent", "none", …) or "#RRGGBB,#RRGGBB".
+    public var backdrop: String {
+        get { defaults.string(forKey: Keys.backdrop) ?? "accent" }
+        set { defaults.set(newValue, forKey: Keys.backdrop) }
     }
 
     // MARK: - Constants
@@ -127,5 +148,7 @@ public final class PicFacetSettings: @unchecked Sendable {
         static let defaultFormat             = "defaultFormat"
         static let defaultResizePercent      = "defaultResizePercent"
         static let defaultDPI                = "defaultDPI"
+        static let accentColor               = "accentColor"
+        static let backdrop                  = "backdrop"
     }
 }

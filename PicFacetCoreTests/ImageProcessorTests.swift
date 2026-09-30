@@ -17,13 +17,31 @@ import Testing
         let progress = ProgressLog()
 
         let result = await ImageProcessor.process([good, bad], BatchSelection(format: .jpeg),
-                                                  policy: OutputPolicy()) { done, total in
-            progress.values.append("\(done)/\(total)")
+                                                  policy: OutputPolicy()) { p in
+            progress.values.append("\(p.completed)/\(p.total)")
         }
 
         #expect(result.succeeded.count == 1)
         #expect(result.failed.map(\.url) == [bad])
         #expect(await progress.values == ["1/2", "2/2"])
+    }
+
+    @Test func keptOriginalReportsBothSizes() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PicFacetTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let source = try Fixture.image(at: dir.appendingPathComponent("a.png"), width: 200, height: 100)
+        let result = await ImageProcessor.process([source], BatchSelection(format: .tiff),
+                                                  policy: OutputPolicy(onlyIfSmaller: true))
+
+        #expect(result.succeeded.isEmpty)
+        #expect(result.keptOriginal == [source])
+        let report = try #require(result.reports.first)
+        let original = try #require(report.originalBytes)
+        let discarded = try #require(report.resultBytes)
+        #expect(original > 0 && discarded >= original)
     }
 }
 

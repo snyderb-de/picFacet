@@ -76,19 +76,19 @@
       "name": "only-if-smaller keeps a smaller file",
       "source": { "name": "photo.png", "width": 200, "height": 100, "noisy": true },
       "selection": { "resize": { "percent": 25 } }, "policy": { "onlyIfSmaller": true },
-      "expect": { "files": ["photo-picfacet.png", "photo.png"], "result": "photo-picfacet.png" }
+      "expect": { "outcome": "written", "files": ["photo-picfacet.png", "photo.png"], "result": "photo-picfacet.png" }
     },
     {
       "name": "only-if-smaller discards a larger file and keeps the original",
       "source": { "name": "photo.png", "width": 200, "height": 100 },
       "selection": { "format": "tiff" }, "policy": { "onlyIfSmaller": true, "deleteOriginalAfterConvert": true },
-      "expect": { "files": ["photo.png"], "result": "photo.png", "sourceUnchanged": true }
+      "expect": { "outcome": "keptOriginal", "files": ["photo.png"], "result": "photo.png", "sourceUnchanged": true }
     },
     {
       "name": "only-if-smaller never touches the source when overwriting",
       "source": { "name": "photo.png", "width": 200, "height": 100 },
       "selection": { "resize": { "percent": 300 } }, "policy": { "overwriteSource": true, "onlyIfSmaller": true },
-      "expect": { "files": ["photo.png"], "result": "photo.png", "sourceUnchanged": true }
+      "expect": { "outcome": "keptOriginal", "files": ["photo.png"], "result": "photo.png", "sourceUnchanged": true }
     },
     {
       "name": "only-if-smaller ignores dpi-only changes",

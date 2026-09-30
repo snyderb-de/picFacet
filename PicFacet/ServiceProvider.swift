@@ -23,14 +23,19 @@ final class ServiceProvider: NSObject {
         guard !urls.isEmpty else { return }
         let policy = PicFacetSettings.shared.outputPolicy
         Task {
-            let result = await ImageProcessor.process(urls, selection, policy: policy) { done, total in
-                NSLog("[PicFacet] progress %d/%d", done, total)
+            let result = await ImageProcessor.process(urls, selection, policy: policy) { p in
+                NSLog("[PicFacet] progress %d/%d", p.completed, p.total)
             }
-            NSLog("[PicFacet] done — ok=%d failed=%d",
-                  result.succeeded.count, result.failed.count)
+            NSLog("[PicFacet] done — ok=%d kept=%d failed=%d",
+                  result.succeeded.count, result.keptOriginal.count, result.failed.count)
             for f in result.failed {
                 NSLog("[PicFacet] fail %@: %@",
                       f.url.lastPathComponent, f.error.localizedDescription)
+            }
+            // One-shot services stay silent on full success. Anything the user
+            // would otherwise not notice (kept originals, failures) gets an alert.
+            if !result.keptOriginal.isEmpty || result.hasErrors {
+                CompletionAlert.show(result, summary: selection.summary)
             }
         }
     }

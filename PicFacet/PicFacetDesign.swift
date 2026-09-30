@@ -17,20 +17,47 @@ enum PFDesign {
     static let onSurfaceVariant = Color.adaptive(light: 0x5D6673, dark: 0xB7C0CC)
     static let outlineVariant   = Color.adaptive(light: 0xBCC6D2, dark: 0x485360)
 
-    // MARK: Accent
-    static let primary          = Color.adaptive(light: 0x005BBF, dark: 0x5AA9FF)
-    static let primaryBright    = Color.adaptive(light: 0x0078FF, dark: 0x8ECBFF)
+    // MARK: Accent (user-chosen, see Theme)
+    static var primary: Color { Theme.shared.accent }
+    static var primaryBright: Color { primary.mix(with: .white, by: 0.3) }
     static let success          = Color.adaptive(light: 0x0A7A4B, dark: 0x53D18C)
     static let amber            = Color.adaptive(light: 0x9B5B00, dark: 0xF0B44D)
-    static let primaryGradient  = LinearGradient(
-        colors: [primary, primaryBright],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    static var primaryGradient: LinearGradient {
+        LinearGradient(colors: [primary, primaryBright], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
 
     // MARK: Radii
     static let rCard: CGFloat  = 8
     static let rInner: CGFloat = 8
+    /// Window-level panels. Large and continuous, like macOS 26 sidebars, so
+    /// glass edges read as Liquid Glass rather than a frosted box.
+    static let rPanel: CGFloat = 20
+
+    /// Window backdrop: the canvas with the user's gradient washed over it.
+    /// Glass needs something under it to refract.
+    static var backdrop: some View {
+        ZStack {
+            canvas
+            BackdropWash(colors: Theme.shared.backdropColors)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+/// The gradient part of the backdrop. Kept faint so text stays readable in
+/// light and dark mode whatever colours are picked.
+struct BackdropWash: View {
+    let colors: [Color]
+
+    var body: some View {
+        if colors.count == 2 {
+            LinearGradient(
+                colors: [colors[0].opacity(0.24), colors[1].opacity(0.12), .clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
 }
 
 // MARK: - Color hex helper
@@ -78,24 +105,39 @@ struct PFCard<Content: View>: View {
     }
 }
 
+/// Liquid Glass panel for the control layer (options, activity). The system
+/// draws the edge highlight and shadow, so no stroke or shadow is added here.
 struct PFPanelBackground: ViewModifier {
     var interactive: Bool = false
 
     func body(content: Content) -> some View {
         content
             .glassEffect(interactive ? .regular.interactive() : .regular,
-                         in: .rect(cornerRadius: PFDesign.rCard))
-            .overlay(
-                RoundedRectangle(cornerRadius: PFDesign.rCard, style: .continuous)
-                    .strokeBorder(PFDesign.outlineVariant.opacity(0.18), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.12), radius: 28, x: 0, y: 14)
+                         in: .rect(cornerRadius: PFDesign.rPanel))
+    }
+}
+
+/// Solid panel for the content layer (files, previews). Apple's guidance is to
+/// keep glass off content, so this is an opaque surface with a hairline.
+struct PFContentPanelBackground: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(PFDesign.surfaceLowest.opacity(0.72),
+                        in: RoundedRectangle(cornerRadius: PFDesign.rPanel, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: PFDesign.rPanel, style: .continuous)
+                    .strokeBorder(PFDesign.outlineVariant.opacity(0.28), lineWidth: 0.5)
+            }
     }
 }
 
 extension View {
     func pfPanel(interactive: Bool = false) -> some View {
         modifier(PFPanelBackground(interactive: interactive))
+    }
+
+    func pfContentPanel() -> some View {
+        modifier(PFContentPanelBackground())
     }
 }
 
@@ -107,41 +149,6 @@ struct PFSectionLabel: View {
             .font(.system(size: 10, weight: .semibold))
             .tracking(1.4)
             .foregroundStyle(PFDesign.onSurfaceVariant)
-    }
-}
-
-// MARK: - Selection chip
-
-struct PFChip: View {
-    let title: String
-    let isSelected: Bool
-    var systemImage: String? = nil
-    let action: () -> Void
-
-    var body: some View {
-        if isSelected {
-            Button(action: action) { chipLabel }
-                .buttonStyle(.glassProminent)
-                .controlSize(.small)
-                .tint(PFDesign.primary)
-        } else {
-            Button(action: action) { chipLabel }
-                .buttonStyle(.glass)
-                .controlSize(.small)
-        }
-    }
-
-    private var chipLabel: some View {
-        HStack(spacing: 6) {
-            if let systemImage {
-                Image(systemName: systemImage)
-                    .font(.system(size: 11, weight: .semibold))
-            }
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
-        }
-        .padding(.horizontal, 3)
-        .padding(.vertical, 1)
     }
 }
 
@@ -235,45 +242,110 @@ struct PFEmptyState: View {
     }
 }
 
-// MARK: - Progress indicator
+// MARK: - Run bar
 
-struct PFProgressView: View {
-    let current: Int
-    let total: Int
-    
-    var progress: Double {
-        total > 0 ? Double(current) / Double(total) : 0
+/// Shows what a run will do, then fills up while it runs. The label is drawn
+/// twice (plain on the track, white on the fill) so it stays readable as the
+/// fill passes under it.
+struct PFRunBar: View {
+    let summary: String
+    var isReady: Bool = true
+    /// nil while idle.
+    var progress: (completed: Int, total: Int)? = nil
+
+    @Environment(\.self) private var environment
+
+    /// Label colour on the fill: dark on light accents (most dark-mode
+    /// presets), white on deep ones.
+    private var onFill: Color {
+        let c = PFDesign.primary.resolve(in: environment)
+        let luminance = 0.2126 * c.linearRed + 0.7152 * c.linearGreen + 0.0722 * c.linearBlue
+        return luminance > 0.2 ? Color(hex: 0x14171C) : .white
     }
-    
+
+    private var fraction: Double {
+        guard let progress, progress.total > 0 else { return 0 }
+        return Double(progress.completed) / Double(progress.total)
+    }
+
+    private var isRunning: Bool { progress != nil }
+    private var isDone: Bool { progress.map { $0.completed == $0.total } ?? false }
+
     var body: some View {
-        VStack(spacing: 10) {
-            // Progress bar
-            GeometryReader { geo in
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+
+        GeometryReader { geo in
+            let fillWidth = geo.size.width * fraction
+
+            ZStack(alignment: .leading) {
+                shape.fill(PFDesign.surfaceLow)
+
+                label(foreground: PFDesign.onSurface, secondary: PFDesign.onSurfaceVariant)
+                    .transaction { $0.animation = nil }
+
                 ZStack(alignment: .leading) {
-                    // Track
-                    Capsule(style: .continuous)
-                        .fill(PFDesign.surfaceLow)
-                        .frame(height: 6)
-                    
-                    // Fill
-                    Capsule(style: .continuous)
-                        .fill(PFDesign.primaryGradient)
-                        .frame(width: geo.size.width * progress, height: 6)
+                    PFDesign.primaryGradient
+                    Shimmer()
+                    label(foreground: onFill, secondary: onFill.opacity(0.8))
+                        .frame(width: geo.size.width, alignment: .leading)
+                        .transaction { $0.animation = nil }
                 }
+                .frame(width: fillWidth, alignment: .leading)
+                .clipShape(shape)
+                .shadow(color: PFDesign.primary.opacity(isRunning ? 0.45 : 0), radius: 10)
             }
-            .frame(height: 6)
-            
-            // Label
-            HStack {
-                Text("Processing images…")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(PFDesign.onSurfaceVariant)
-                Spacer()
-                Text("\(current) of \(total)")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(PFDesign.primary)
+            // Fill grows with a spring; resetting to idle snaps back.
+            .animation(isRunning ? .spring(response: 0.55, dampingFraction: 0.82) : nil, value: fraction)
+        }
+        .frame(height: 48)
+        .overlay { shape.strokeBorder(PFDesign.outlineVariant.opacity(0.25), lineWidth: 0.5) }
+    }
+
+    private func label(foreground: Color, secondary: Color) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(isRunning ? foreground : (isReady ? PFDesign.success : secondary))
+            Text(isRunning ? (isDone ? "Done" : "Processing…") : summary)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isRunning || isReady ? foreground : secondary)
+                .lineLimit(2)
+            Spacer(minLength: 8)
+            if let progress {
+                Text("\(progress.completed) of \(progress.total)")
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(secondary)
             }
         }
+        .padding(.horizontal, 14)
+    }
+
+    private var icon: String {
+        if isDone { return "checkmark.circle.fill" }
+        if isRunning { return "sparkles" }
+        return isReady ? "checkmark.circle.fill" : "circle.dashed"
+    }
+}
+
+/// A soft highlight sweeping left to right, forever.
+private struct Shimmer: View {
+    var body: some View {
+        TimelineView(.animation) { context in
+            GeometryReader { geo in
+                let period = 1.6
+                let phase = context.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: period) / period
+                let band = max(geo.size.width * 0.35, 80)
+                LinearGradient(
+                    colors: [.clear, .white.opacity(0.35), .clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: band)
+                .offset(x: -band + phase * (geo.size.width + band))
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 
@@ -317,16 +389,8 @@ struct PFInfoRow: View {
                     .font(.system(size: 12))
                     .foregroundStyle(PFDesign.onSurface)
                 
-                // Chips
-                HStack(spacing: 8) {
-                    PFChip(title: "Selected", isSelected: true) { }
-                    PFChip(title: "Option 2", isSelected: false) { }
-                    PFChip(title: "Option 3", isSelected: false) { }
-                }
-                
-                // Progress example
-                PFProgressView(current: 7, total: 10)
-                
+                PFRunBar(summary: "Convert to PNG", progress: (7, 10))
+
                 // Info rows
                 PFInfoRow(label: "Design System", value: "Ethereal Workspace")
                 PFInfoRow(label: "Material", value: "Native")

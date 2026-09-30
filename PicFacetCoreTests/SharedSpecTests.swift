@@ -46,6 +46,8 @@ import Testing
             let customOutputFolder: String?
         }
         struct Expect: Decodable {
+            /// "written" or "keptOriginal".
+            let outcome: String?
             let files: [String]?
             let result: String?
             let pixels: [Int]?
@@ -116,7 +118,19 @@ import Testing
         if let files = c.expect.files {
             #expect(try Fixture.files(in: dir) == files)
         }
-        let output = try #require(result.succeeded.first)
+        let report = try #require(result.reports.first)
+        let output: URL
+        switch report.outcome {
+        case .written(let url):
+            output = url
+            #expect(c.expect.outcome ?? "written" == "written")
+        case .keptOriginal:
+            output = report.source
+            #expect(c.expect.outcome == "keptOriginal")
+        case .failed(let error):
+            Issue.record(error)
+            return
+        }
         if let expected = c.expect.result {
             #expect(output.standardizedFileURL == dir.appendingPathComponent(expected).standardizedFileURL)
         }

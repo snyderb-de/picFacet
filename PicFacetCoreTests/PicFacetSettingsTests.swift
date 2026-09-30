@@ -53,6 +53,17 @@ import Testing
         #expect(draft.selection == BatchSelection(format: .webp, resize: .percent(75), dpi: 300))
     }
 
+    @Test func noChangeDefaultsRoundTrip() {
+        settings.defaultFormat = nil
+        settings.defaultResizePercent = nil
+        settings.defaultDPI = nil
+
+        #expect(settings.defaultFormat == nil)
+        #expect(settings.defaultResizePercent == nil)
+        #expect(settings.defaultDPI == nil)
+        #expect(OperationDraft.defaults(from: settings) == OperationDraft())
+    }
+
     @Test func nonPresetResizeDefaultFallsBackTo50() {
         settings.defaultResizePercent = 33
         #expect(OperationDraft.defaults(from: settings).resizeMode == .percent(50))
