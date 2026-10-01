@@ -9,7 +9,13 @@ import UniformTypeIdentifiers
 /// `AppDelegate.application(_:open:)`).
 final class FinderSync: FIFinderSync {
 
-    private static let mainAppBundleID = "com.picfacet.app"
+    /// The app that contains this extension (App.app/Contents/PlugIns/X.appex).
+    /// Not looked up by bundle ID: other copies of the app (e.g. in /Applications)
+    /// would be picked instead of the one this extension shipped with.
+    private static let hostAppURL = Bundle.main.bundleURL
+        .deletingLastPathComponent()  // PlugIns
+        .deletingLastPathComponent()  // Contents
+        .deletingLastPathComponent()  // App.app
 
     override init() {
         super.init()
@@ -31,12 +37,11 @@ final class FinderSync: FIFinderSync {
 
     @objc private func openChooser(_ sender: Any?) {
         let urls = (FIFinderSyncController.default().selectedItemURLs() ?? []).filter(Self.isImage)
-        guard !urls.isEmpty,
-              let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.mainAppBundleID)
-        else {
-            NSLog("[PicFacetFinderSync] nothing to open (urls=%d)", urls.count)
+        guard !urls.isEmpty else {
+            NSLog("[PicFacetFinderSync] nothing to open")
             return
         }
+        let appURL = Self.hostAppURL
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true
         NSWorkspace.shared.open(urls, withApplicationAt: appURL, configuration: config) { _, error in
