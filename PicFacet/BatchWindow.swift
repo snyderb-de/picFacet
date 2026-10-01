@@ -25,8 +25,8 @@ final class BatchWindowController {
             win.isReleasedWhenClosed = false
             win.level = .floating
             win.backgroundColor = .windowBackgroundColor
-            win.setContentSize(NSSize(width: 880, height: 680))
-            win.minSize = NSSize(width: 780, height: 600)
+            win.setContentSize(NSSize(width: 880, height: 720))
+            win.minSize = NSSize(width: 780, height: 640)
             win.center()
             window = win
         } else {
@@ -58,16 +58,22 @@ struct BatchView: View {
     }
     
     var body: some View {
-        GlassEffectContainer(spacing: 22) {
-            rootContent
+        VStack(spacing: 0) {
+            GlassEffectContainer(spacing: 22) {
+                rootContent
+            }
+            .padding(.horizontal, 30)
+            .padding(.top, 30)
+            .padding(.bottom, 22)
+
+            PFStatusBar(status: files.isEmpty ? "" : "\(files.count) image\(files.count == 1 ? "" : "s")")
         }
-        .padding(30)
         .frame(
             minWidth: 780,
             idealWidth: 880,
             maxWidth: .infinity,
-            minHeight: 600,
-            idealHeight: 680,
+            minHeight: 640,
+            idealHeight: 720,
             maxHeight: .infinity
         )
         .background { PFDesign.backdrop }
@@ -115,8 +121,6 @@ struct BatchView: View {
             }
 
             Spacer()
-
-            PFWindowControls()
 
             if !files.isEmpty {
                 HStack(spacing: 8) {

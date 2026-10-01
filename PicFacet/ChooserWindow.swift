@@ -41,8 +41,8 @@ final class ChooserWindowController {
 struct ChooserView: View {
     /// Outer padding 30×2 + files panel 300 + gap 22 + options panel (~560).
     /// Anything narrower clips the files panel and overlaps the options.
-    static let minSize = NSSize(width: 960, height: 620)
-    static let idealSize = NSSize(width: 1000, height: 660)
+    static let minSize = NSSize(width: 960, height: 660)
+    static let idealSize = NSSize(width: 1000, height: 700)
 
     let urls: [URL]
     /// Closes the window: on Cancel, or after a run and its alert.
@@ -77,10 +77,16 @@ struct ChooserView: View {
     private var canStart: Bool { draft.selection != nil }
 
     var body: some View {
-        GlassEffectContainer(spacing: 18) {
-            rootContent
+        VStack(spacing: 0) {
+            GlassEffectContainer(spacing: 18) {
+                rootContent
+            }
+            .padding(.horizontal, 30)
+            .padding(.top, 30)
+            .padding(.bottom, 22)
+
+            PFStatusBar(status: "\(fileCount) image\(fileCount == 1 ? "" : "s") · \(totalSizeSummary)")
         }
-        .padding(30)
         .frame(
             minWidth: Self.minSize.width,
             idealWidth: Self.idealSize.width,
@@ -258,20 +264,6 @@ struct ChooserView: View {
                     .foregroundStyle(PFDesign.onSurfaceVariant)
             }
 
-            Spacer()
-
-            PFWindowControls()
-
-            HStack(spacing: 8) {
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                Text("\(fileCount)")
-                    .font(.system(size: 13, weight: .semibold))
-            }
-            .foregroundStyle(PFDesign.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(PFDesign.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
     }
 

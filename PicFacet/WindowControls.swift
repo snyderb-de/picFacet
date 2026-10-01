@@ -55,31 +55,74 @@ final class SettingsWindowController {
     }
 }
 
-/// Light/dark toggle and Settings gear shown in the top corner of the Batch
-/// and Chooser windows.
-struct PFWindowControls: View {
+/// Square icon button used in the status bar: its own quiet background, no
+/// shared capsule, brighter on hover.
+struct PFBarButton: View {
+    let systemImage: String
+    let help: String
+    var isEnabled = true
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(PFDesign.onSurfaceVariant)
+                .frame(width: 26, height: 22)
+                .background(
+                    PFDesign.surfaceLow.opacity(hovering && isEnabled ? 1 : 0.55),
+                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(PFDesign.outlineVariant.opacity(0.2), lineWidth: 1)
+                }
+                .opacity(isEnabled ? 1 : 0.45)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .onHover { hovering = $0 }
+        .help(help)
+    }
+}
+
+/// Thin bar along the bottom of the Batch and Chooser windows: app-level
+/// buttons on the left, a status readout on the right. Add new buttons in
+/// `buttons`; they're separate squares, so the row can grow.
+struct PFStatusBar: View {
+    /// Right-aligned readout, e.g. "3 images · 4.2 MB".
+    var status: String = ""
+
     @State private var isDark = AppearanceController.isDark
 
     var body: some View {
         HStack(spacing: 8) {
-            Button {
-                AppearanceController.set(isDark ? .light : .dark)
-            } label: {
-                Image(systemName: isDark ? "sun.max.fill" : "moon.fill")
-                    .frame(width: 16, height: 16)
-            }
-            .help(isDark ? "Switch to light appearance" : "Switch to dark appearance")
-
-            Button {
+            PFBarButton(systemImage: "gearshape", help: "Settings") {
                 SettingsWindowController.shared.show()
-            } label: {
-                Image(systemName: "gearshape.fill")
-                    .frame(width: 16, height: 16)
             }
-            .help("Settings")
+            PFBarButton(systemImage: isDark ? "sun.max" : "moon",
+                        help: isDark ? "Switch to light appearance" : "Switch to dark appearance") {
+                AppearanceController.set(isDark ? .light : .dark)
+            }
+            // Placeholder until the manual exists.
+            PFBarButton(systemImage: "book.closed", help: "User manual (coming soon)", isEnabled: false) {}
+
+            Spacer()
+
+            if !status.isEmpty {
+                Text(status)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(PFDesign.onSurfaceVariant)
+            }
         }
-        .buttonStyle(.glass)
-        .controlSize(.regular)
+        .padding(.horizontal, 16)
+        .frame(height: 34)
+        .background(PFDesign.chrome.opacity(0.6))
+        .overlay(alignment: .top) {
+            Rectangle().fill(PFDesign.outlineVariant.opacity(0.2)).frame(height: 1)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .picFacetAppearanceChanged)) { _ in
             // The window re-renders with the new appearance a tick later.
             DispatchQueue.main.async { isDark = AppearanceController.isDark }
