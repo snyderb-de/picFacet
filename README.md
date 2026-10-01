@@ -27,7 +27,7 @@ Right-click any image (or batch of images) in Finder and pick a PicFacet Quick A
 - **Resize** by percent presets (10/25/50/75/90%)
 - **Change DPI** to 72 / 96 / 150 / 300 / 600 / 1200 / 2400 / 3600
 
-Or pick **PicFacet…** to get the full picker window with every option in one place.
+Or pick **PicFacet…** to get the full picker window with every option in one place. With the Finder extension enabled, **PicFacet…** also appears directly in the top level of the right-click menu.
 
 A menu bar icon hosts settings, a batch processor, and a "How to enable Quick Actions…" helper.
 
@@ -40,14 +40,18 @@ PicFacet.xcodeproj           (generated — gitignored)
 │
 ├── PicFacet                 (main app, menu-bar resident, LSUIElement)
 │   ├── PicFacetApp.swift
-│   ├── AppDelegate.swift          — registers NSApp.servicesProvider
+│   ├── AppDelegate.swift          — registers NSApp.servicesProvider; handles picfacet:// and open-file events
 │   ├── ServiceProvider.swift      — two @objc entry points; NSUserData picks the operation
 │   ├── ChooserWindow.swift        — full picker window for "PicFacet…"
 │   ├── BatchWindow.swift          — drag-and-drop batch processor
 │   ├── PicFacetDesign.swift       — PFDesign tokens + Liquid Glass modifiers
 │   ├── OnboardingWindow.swift     — first-launch help window
 │   ├── MenuBarController.swift    — NSStatusItem + settings
+│   ├── WindowControls.swift       — bottom status bar, appearance + Settings window controllers
 │   └── SettingsView.swift
+│
+├── PicFacetFinderSync       (sandboxed Finder Sync extension: top-level "PicFacet…" menu item)
+│   └── FinderSync.swift           — sends selected paths to the app as picfacet://open?path=…
 │
 ├── PicFacetCoreTests        (Swift Testing, runs with the PicFacet scheme)
 │
@@ -63,9 +67,11 @@ PicFacet.xcodeproj           (generated — gitignored)
     └── PicFacetError.swift
 ```
 
-### Why NSServices instead of a Finder Sync Extension?
+### NSServices and the Finder Sync extension
 
-The first cut of this project used a Finder Sync Extension (the heavy `FIFinderSync` API used by Dropbox/iCloud). Every menu click died in the sandbox. NSServices runs in the main app's process, hands us file URLs directly via the pasteboard, needs no IPC, no App Groups, no bookmarks, and is App Store compatible. It's the right tool for "right-click → do a thing." See `refactor.md` for the full story.
+Quick Actions (NSServices) always land in Finder's **Quick Actions** submenu. To get a top-level item, the app also ships a small Finder Sync extension. It does no image work: a sandboxed extension gets no file access for Finder's selection, so it passes the selected paths to the main app in a `picfacet://open?path=…` URL and the app opens the chooser. Enable it once in **System Settings → General → Login Items & Extensions → Finder**.
+
+Why not *only* a Finder Sync extension? The first cut of this project used a Finder Sync Extension (the heavy `FIFinderSync` API used by Dropbox/iCloud). Every menu click died in the sandbox. NSServices runs in the main app's process, hands us file URLs directly via the pasteboard, needs no IPC, no App Groups, no bookmarks, and is App Store compatible. It's the right tool for "right-click → do a thing." See `refactor.md` for the full story.
 
 ---
 
@@ -94,6 +100,8 @@ The onboarding window appears automatically and walks you through enabling the Q
 **System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders / Pictures**
 
 Tick the PicFacet entries you want. The **PicFacet…** entry is the most useful one — it opens the full picker for any image.
+
+For a top-level right-click item, also enable the **PicFacet Finder Extension** (see below). Folder permissions (Desktop, Documents, Downloads, Full Disk Access) live in **Settings → File Access**.
 
 You can re-open the onboarding window any time from the menu bar icon → **How to enable Quick Actions…**
 
