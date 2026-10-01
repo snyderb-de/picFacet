@@ -23,7 +23,6 @@ final class BatchWindowController {
             win.titlebarAppearsTransparent = true
             win.title = "PicFacet Processing"
             win.isReleasedWhenClosed = false
-            win.level = .floating
             win.backgroundColor = .windowBackgroundColor
             win.setContentSize(NSSize(width: 880, height: 720))
             win.minSize = NSSize(width: 780, height: 640)

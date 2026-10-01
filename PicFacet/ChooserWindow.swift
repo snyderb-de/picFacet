@@ -20,7 +20,6 @@ final class ChooserWindowController {
             win.isMovableByWindowBackground = true
             win.title = "PicFacet"
             win.isReleasedWhenClosed = false
-            win.level = .floating
             win.backgroundColor = NSColor(PFDesign.canvas)
             win.setContentSize(ChooserView.idealSize)
             win.contentMinSize = ChooserView.minSize
