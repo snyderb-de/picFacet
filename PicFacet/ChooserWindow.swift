@@ -22,8 +22,8 @@ final class ChooserWindowController {
             win.isReleasedWhenClosed = false
             win.level = .floating
             win.backgroundColor = NSColor(PFDesign.canvas)
-            win.setContentSize(NSSize(width: 900, height: 600))
-            win.minSize = NSSize(width: 820, height: 560)
+            win.setContentSize(ChooserView.idealSize)
+            win.contentMinSize = ChooserView.minSize
             win.center()
             window = win
         } else {
@@ -39,6 +39,11 @@ final class ChooserWindowController {
 // MARK: - View
 
 struct ChooserView: View {
+    /// Outer padding 30×2 + files panel 300 + gap 22 + options panel (~560).
+    /// Anything narrower clips the files panel and overlaps the options.
+    static let minSize = NSSize(width: 960, height: 620)
+    static let idealSize = NSSize(width: 1000, height: 660)
+
     let urls: [URL]
     /// Closes the window: on Cancel, or after a run and its alert.
     let onClose: () -> Void
@@ -77,11 +82,11 @@ struct ChooserView: View {
         }
         .padding(30)
         .frame(
-            minWidth: 820,
-            idealWidth: 900,
+            minWidth: Self.minSize.width,
+            idealWidth: Self.idealSize.width,
             maxWidth: .infinity,
-            minHeight: 560,
-            idealHeight: 600,
+            minHeight: Self.minSize.height,
+            idealHeight: Self.idealSize.height,
             maxHeight: .infinity
         )
         .background { PFDesign.backdrop }
@@ -106,7 +111,7 @@ struct ChooserView: View {
                 .padding(22)
                 .pfPanel()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
     
@@ -157,12 +162,16 @@ struct ChooserView: View {
                 .fill(PFDesign.surfaceLow)
 
             if let thumbnail = loadedThumbnail {
-                Image(nsImage: thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // Overlay on a clear shape so the image's own size can't
+                // widen the panel (an .aspectRatio(.fill) image would).
+                Color.clear
+                    .overlay {
+                        Image(nsImage: thumbnail)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .saturation(1.04)
+                    }
                     .clipped()
-                    .saturation(1.04)
             } else {
                 Image(systemName: "photo.on.rectangle.angled")
                     .font(.system(size: 42, weight: .light))
