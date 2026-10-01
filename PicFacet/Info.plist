@@ -15,9 +15,9 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.2.0</string>
+    <string>1.2.1</string>
     <key>CFBundleVersion</key>
-    <string>4</string>
+    <string>5</string>
     <!-- Declares image support so the Finder Sync extension can hand files to
          the app via NSWorkspace.open. Alternate rank: never becomes the default
          app for images. -->

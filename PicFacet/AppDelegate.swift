@@ -31,17 +31,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("========================================")
     }
 
+    /// Most paths a single `picfacet://` link may carry. Real Finder selections
+    /// can be large; this only stops an absurd link from building a huge list.
+    private static let maxLinkedPaths = 500
+
     /// Receives files from the Finder Sync extension (`picfacet://open?path=…`)
     /// or dropped on the app icon.
+    ///
+    /// Any local app or web page can send a `picfacet://` link, so it is
+    /// treated as untrusted input: only absolute paths to existing regular
+    /// image files are kept, and it can only populate the Chooser. Nothing is
+    /// processed until the user clicks Start Processing.
     func application(_ application: NSApplication, open urls: [URL]) {
         let files = urls.flatMap { url -> [URL] in
             guard url.scheme == "picfacet" else { return [url] }
             let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
             return items.filter { $0.name == "path" }
                 .compactMap { $0.value }
-                .map { URL(fileURLWithPath: $0) }
+                .filter { $0.hasPrefix("/") }
+                .prefix(Self.maxLinkedPaths)
+                .map { URL(fileURLWithPath: $0).standardizedFileURL }
         }
-        let images = files.filter { $0.isImageFile && FileManager.default.fileExists(atPath: $0.path) }
+        let images = files.filter { url in
+            guard url.isImageFile else { return false }
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey])
+            return values?.isRegularFile == true
+        }
         NSLog("[PicFacet] open(urls:) — %d image(s)", images.count)
         guard !images.isEmpty else { return }
         ChooserWindowController.shared.show(urls: images)
