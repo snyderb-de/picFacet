@@ -35,26 +35,6 @@ final class OnboardingWindowController {
     }
 }
 
-/// Triggers macOS's one-time folder prompts up front, so the first right-click
-/// doesn't stall on a permission dialog.
-enum FileAccess {
-    static func requestCommonFolders() {
-        let fm = FileManager.default
-        let dirs: [FileManager.SearchPathDirectory] = [.desktopDirectory, .documentDirectory, .downloadsDirectory]
-        for dir in dirs {
-            guard let url = fm.urls(for: dir, in: .userDomainMask).first else { continue }
-            // Listing the folder is what makes macOS show the prompt.
-            _ = try? fm.contentsOfDirectory(atPath: url.path)
-        }
-    }
-
-    static func openFullDiskAccessSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-}
-
 struct OnboardingView: View {
     let onClose: () -> Void
 
@@ -87,25 +67,6 @@ Tip: enable **PicFacet…** to get the full picker (every format, every preset) 
                     .lineSpacing(3)
             }
 
-            PFCard {
-                PFSectionLabel(text: "Allow File Access")
-                Text("""
-PicFacet needs permission to read the images you right-click. macOS asks once per folder (Desktop, Documents, Downloads, external drives).
-
-**Allow Folder Access** asks for the common folders now. For every folder at once, including other drives, add PicFacet under **Full Disk Access**.
-""")
-                    .font(.system(size: 12))
-                    .foregroundStyle(PFDesign.onSurface)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .lineSpacing(3)
-                HStack(spacing: 12) {
-                    Button("Allow Folder Access") { FileAccess.requestCommonFolders() }
-                        .pfSecondaryActionStyle()
-                    Button("Full Disk Access…") { FileAccess.openFullDiskAccessSettings() }
-                        .pfSecondaryActionStyle()
-                }
-            }
-
             HStack(spacing: 12) {
                 Button("Open System Settings") {
                     if let url = URL(string: "x-apple.systempreferences:com.apple.preference.keyboard?Services") {
@@ -113,6 +74,13 @@ PicFacet needs permission to read the images you right-click. macOS asks once pe
                     }
                 }
                 .pfSecondaryActionStyle()
+
+                Button("File Access…") {
+                    onClose()
+                    SettingsWindowController.shared.show()
+                }
+                .pfSecondaryActionStyle()
+                .help("Folder permissions live in Settings")
 
                 Button("Got it", action: onClose)
                     .pfPrimaryActionStyle()

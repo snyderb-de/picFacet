@@ -116,6 +116,8 @@ struct BatchView: View {
 
             Spacer()
 
+            PFWindowControls()
+
             if !files.isEmpty {
                 HStack(spacing: 8) {
                     Image(systemName: isProcessing ? "gearshape.2.fill" : "photo.stack")

@@ -47,8 +47,10 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                     .frame(width: 220)
                     .onChange(of: appearance) { _, v in
-                        PicFacetSettings.shared.appAppearance = v
-                        applyAppearance(v)
+                        if v != PicFacetSettings.shared.appAppearance { AppearanceController.set(v) }
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .picFacetAppearanceChanged)) { _ in
+                        appearance = PicFacetSettings.shared.appAppearance
                     }
                 } label: {
                     Text("Appearance")
@@ -98,6 +100,22 @@ struct SettingsView: View {
                     }
                 }
                 .padding(.vertical, 4)
+            }
+
+            Section("File Access") {
+                LabeledContent {
+                    Button("Allow Folder Access") { FileAccess.requestCommonFolders() }
+                } label: {
+                    Text("Common folders")
+                    Text("Ask macOS now for Desktop, Documents and Downloads, so the first right-click doesn't stall on a prompt.")
+                }
+
+                LabeledContent {
+                    Button("Open Full Disk Access…") { FileAccess.openFullDiskAccessSettings() }
+                } label: {
+                    Text("Every folder and drive")
+                    Text("Add PicFacet under Full Disk Access to cover external and network drives too.")
+                }
             }
 
             Section("Defaults") {
@@ -215,14 +233,6 @@ struct SettingsView: View {
             }
         )
     }
-
-    private func applyAppearance(_ value: PicFacetSettings.AppAppearance) {
-        switch value {
-        case .system: NSApp.appearance = nil
-        case .light:  NSApp.appearance = NSAppearance(named: .aqua)
-        case .dark:   NSApp.appearance = NSAppearance(named: .darkAqua)
-        }
-    }
 }
 
 /// A selectable colour sample with a ring when chosen.
@@ -245,5 +255,25 @@ private struct Swatch<Fill: View>: View {
         }
         .buttonStyle(.plain)
         .help(help)
+    }
+}
+
+/// Triggers macOS's one-time folder prompts up front, so the first right-click
+/// doesn't stall on a permission dialog.
+enum FileAccess {
+    static func requestCommonFolders() {
+        let fm = FileManager.default
+        let dirs: [FileManager.SearchPathDirectory] = [.desktopDirectory, .documentDirectory, .downloadsDirectory]
+        for dir in dirs {
+            guard let url = fm.urls(for: dir, in: .userDomainMask).first else { continue }
+            // Listing the folder is what makes macOS show the prompt.
+            _ = try? fm.contentsOfDirectory(atPath: url.path)
+        }
+    }
+
+    static func openFullDiskAccessSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }

@@ -4,7 +4,6 @@ import PicFacetCore
 
 final class MenuBarController {
     private let statusItem: NSStatusItem
-    private var settingsWindow: NSWindow?
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -123,23 +122,7 @@ final class MenuBarController {
     }
 
     @objc private func openSettings() {
-        if settingsWindow == nil {
-            let view = NSHostingView(rootView: SettingsView())
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 580, height: 680),
-                styleMask: [.titled, .closable, .resizable],
-                backing: .buffered,
-                defer: false
-            )
-            window.title = "PicFacet Settings"
-            window.contentView = view
-            window.minSize = NSSize(width: 520, height: 560)
-            window.center()
-            window.isReleasedWhenClosed = false
-            settingsWindow = window
-        }
-        settingsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate()
+        SettingsWindowController.shared.show()
     }
 
     @objc private func openOnboarding() {
@@ -152,20 +135,8 @@ final class MenuBarController {
             return
         }
 
-        PicFacetSettings.shared.appAppearance = appearance
-        applyAppearance(appearance)
+        AppearanceController.set(appearance)
         buildMenu()
-    }
-
-    private func applyAppearance(_ appearance: PicFacetSettings.AppAppearance) {
-        switch appearance {
-        case .system:
-            NSApp.appearance = nil
-        case .light:
-            NSApp.appearance = NSAppearance(named: .aqua)
-        case .dark:
-            NSApp.appearance = NSAppearance(named: .darkAqua)
-        }
     }
 }
 

@@ -13,7 +13,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         NSLog("[AppDelegate] Activation policy set to .accessory")
         
-        applySavedAppearance()
+        AppearanceController.apply(PicFacetSettings.shared.appAppearance)
         
         menuBarController = MenuBarController()
         NSLog("[AppDelegate] MenuBarController created")
@@ -45,16 +45,5 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("[PicFacet] open(urls:) — %d image(s)", images.count)
         guard !images.isEmpty else { return }
         ChooserWindowController.shared.show(urls: images)
-    }
-
-    private func applySavedAppearance() {
-        switch PicFacetSettings.shared.appAppearance {
-        case .system:
-            NSApp.appearance = nil
-        case .light:
-            NSApp.appearance = NSAppearance(named: .aqua)
-        case .dark:
-            NSApp.appearance = NSAppearance(named: .darkAqua)
-        }
     }
 }

@@ -260,6 +260,8 @@ struct ChooserView: View {
 
             Spacer()
 
+            PFWindowControls()
+
             HStack(spacing: 8) {
                 Image(systemName: "bolt.fill")
                     .font(.system(size: 12, weight: .semibold))
