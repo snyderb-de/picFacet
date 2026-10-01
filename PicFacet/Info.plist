@@ -36,6 +36,19 @@
             </array>
         </dict>
     </array>
+    <!-- picfacet://open?path=…  Used by the Finder Sync extension: the sandboxed
+         extension can't open files itself, so it passes the paths in a URL. -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.picfacet.app</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>picfacet</string>
+            </array>
+        </dict>
+    </array>
     <key>LSMinimumSystemVersion</key>
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>LSUIElement</key>

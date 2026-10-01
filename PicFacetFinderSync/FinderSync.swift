@@ -5,8 +5,9 @@ import UniformTypeIdentifiers
 /// Adds a top-level "PicFacet…" item to Finder's right-click menu for images.
 ///
 /// The extension is sandboxed and does no image work itself: it hands the
-/// selected files to the main app, which opens the chooser (see
-/// `AppDelegate.application(_:open:)`).
+/// selected paths to the main app in a `picfacet://open?path=…` URL (a sandboxed
+/// extension can't open the files themselves). The app opens the chooser; see
+/// `AppDelegate.application(_:open:)`.
 final class FinderSync: FIFinderSync {
 
     /// The app that contains this extension (App.app/Contents/PlugIns/X.appex).
@@ -42,9 +43,14 @@ final class FinderSync: FIFinderSync {
             return
         }
         let appURL = Self.hostAppURL
+        var components = URLComponents()
+        components.scheme = "picfacet"
+        components.host = "open"
+        components.queryItems = urls.map { URLQueryItem(name: "path", value: $0.path) }
+        guard let openURL = components.url else { return }
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true
-        NSWorkspace.shared.open(urls, withApplicationAt: appURL, configuration: config) { _, error in
+        NSWorkspace.shared.open([openURL], withApplicationAt: appURL, configuration: config) { _, error in
             if let error { NSLog("[PicFacetFinderSync] open failed: %@", error.localizedDescription) }
         }
     }

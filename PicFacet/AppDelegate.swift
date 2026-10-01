@@ -31,10 +31,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("========================================")
     }
 
-    /// Receives files handed over by the Finder Sync extension's top-level
-    /// "PicFacet…" item (or dropped on the app icon).
+    /// Receives files from the Finder Sync extension (`picfacet://open?path=…`)
+    /// or dropped on the app icon.
     func application(_ application: NSApplication, open urls: [URL]) {
-        let images = urls.filter { $0.isImageFile }
+        let files = urls.flatMap { url -> [URL] in
+            guard url.scheme == "picfacet" else { return [url] }
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            return items.filter { $0.name == "path" }
+                .compactMap { $0.value }
+                .map { URL(fileURLWithPath: $0) }
+        }
+        let images = files.filter { $0.isImageFile && FileManager.default.fileExists(atPath: $0.path) }
         NSLog("[PicFacet] open(urls:) — %d image(s)", images.count)
         guard !images.isEmpty else { return }
         ChooserWindowController.shared.show(urls: images)

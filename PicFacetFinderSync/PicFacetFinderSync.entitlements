@@ -4,13 +4,5 @@
 <dict>
     <key>com.apple.security.app-sandbox</key>
     <true/>
-    <!-- Finder hands this extension selected paths but no sandbox extension for
-         them, so LaunchServices refuses to open them on its behalf. Read-only
-         access to / lets NSWorkspace.open pass the files to the main app.
-         Direct-distribution only; App Store would need a different hand-off. -->
-    <key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
-    <array>
-        <string>/</string>
-    </array>
 </dict>
 </plist>
