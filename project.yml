@@ -11,6 +11,7 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_STYLE: Automatic
+    PRODUCT_NAME: "$(TARGET_NAME)"
 
 targets:
 
@@ -26,6 +27,7 @@ targets:
         INFOPLIST_FILE: PicFacetCore/Info.plist
         DEFINES_MODULE: YES
         SKIP_INSTALL: YES
+        LD_DYLIB_INSTALL_NAME: "@rpath/PicFacetCore.framework/Versions/A/PicFacetCore"
 
   PicFacet:
     type: application
@@ -44,9 +46,25 @@ targets:
       - target: PicFacetCore
         embed: true
         codeSign: true
+      - target: PicFacetFinderSync
+        embed: true
+        codeSign: true
     scheme:
       testTargets:
         - PicFacetCoreTests
+
+  PicFacetFinderSync:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - PicFacetFinderSync
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.picfacet.app.FinderSync
+        INFOPLIST_FILE: PicFacetFinderSync/Info.plist
+        CODE_SIGN_ENTITLEMENTS: PicFacetFinderSync/PicFacetFinderSync.entitlements
+        SKIP_INSTALL: YES
 
   PicFacetCoreTests:
     type: bundle.unit-test

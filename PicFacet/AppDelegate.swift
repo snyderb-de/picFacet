@@ -31,6 +31,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("========================================")
     }
 
+    /// Receives files handed over by the Finder Sync extension's top-level
+    /// "PicFacet…" item (or dropped on the app icon).
+    func application(_ application: NSApplication, open urls: [URL]) {
+        let images = urls.filter { $0.isImageFile }
+        NSLog("[PicFacet] open(urls:) — %d image(s)", images.count)
+        guard !images.isEmpty else { return }
+        ChooserWindowController.shared.show(urls: images)
+    }
+
     private func applySavedAppearance() {
         switch PicFacetSettings.shared.appAppearance {
         case .system:
