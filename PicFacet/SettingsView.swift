@@ -61,8 +61,26 @@ struct SettingsView: View {
             
             Section("Theme") {
                 VStack(alignment: .leading, spacing: 10) {
+                    settingLabel("Color theme", "Surfaces, text and accent. Each has a light and a dark version.")
+                    HStack(spacing: 10) {
+                        ForEach(ColorTheme.all) { colorTheme in
+                            ThemeChip(colorTheme: colorTheme, isSelected: theme.colorThemeID == colorTheme.id) {
+                                theme.select(colorTheme: colorTheme.id)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+
+                VStack(alignment: .leading, spacing: 10) {
                     settingLabel("Accent color", "Buttons, highlights and the progress bar.")
                     HStack(spacing: 8) {
+                        Swatch(isSelected: theme.accentID == Theme.themeAccentID, help: "Theme accent", circular: true) {
+                            Circle().fill(Color.themed(\.accent))
+                        } action: {
+                            theme.accentID = Theme.themeAccentID
+                        }
+                        Divider().frame(height: 18)
                         ForEach(AccentPreset.all) { preset in
                             Swatch(isSelected: theme.accentID == preset.id, help: preset.name, circular: true) {
                                 Circle().fill(preset.color)
@@ -282,5 +300,51 @@ enum FileAccess {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
             NSWorkspace.shared.open(url)
         }
+    }
+}
+
+/// A small preview of a color theme: its canvas and surface with the accent
+/// dot, drawn in the current light/dark appearance, and its name beneath.
+private struct ThemeChip: View {
+    let colorTheme: ColorTheme
+    let isSelected: Bool
+    let action: () -> Void
+
+    @Environment(\.colorScheme) private var scheme
+
+    private var palette: Palette { scheme == .dark ? colorTheme.dark : colorTheme.light }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color(hex: palette.canvas))
+                    .frame(width: 54, height: 38)
+                    .overlay(alignment: .topLeading) {
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(Color(hex: palette.surfaceLowest))
+                            .frame(width: 30, height: 18)
+                            .overlay(alignment: .leading) {
+                                Capsule().fill(Color(hex: palette.onSurface).opacity(0.7))
+                                    .frame(width: 16, height: 3).padding(.leading, 5)
+                            }
+                            .padding(5)
+                    }
+                    .overlay(alignment: .bottomTrailing) {
+                        Circle().fill(Color(hex: palette.accent)).frame(width: 12, height: 12).padding(5)
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .strokeBorder(isSelected ? Color.primary.opacity(0.75) : Color.primary.opacity(0.15),
+                                          lineWidth: isSelected ? 2 : 1)
+                    }
+                Text(colorTheme.name)
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(.plain)
+        .help(colorTheme.name)
     }
 }

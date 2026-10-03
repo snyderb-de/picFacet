@@ -18,12 +18,30 @@ import PicFacetCore
         didSet { PicFacetSettings.shared.backdrop = backdropID }
     }
 
+    /// Id from `ColorTheme.all`. See `PicFacetSettings.colorTheme`.
+    var colorThemeID: String {
+        didSet { PicFacetSettings.shared.colorTheme = colorThemeID }
+    }
+
     private init() {
         accentID = PicFacetSettings.shared.accentColor
         backdropID = PicFacetSettings.shared.backdrop
+        colorThemeID = PicFacetSettings.shared.colorTheme
     }
 
+    var colorTheme: ColorTheme { ColorTheme.theme(id: colorThemeID) }
+
+    /// Picks a color theme. Its own accent is used until the user picks one.
+    func select(colorTheme id: String) {
+        colorThemeID = id
+        accentID = Self.themeAccentID
+    }
+
+    /// `accentID` meaning "use the color theme's accent".
+    static let themeAccentID = "theme"
+
     var accent: Color {
+        if accentID == Self.themeAccentID { return .themed(\.accent) }
         if let preset = AccentPreset.all.first(where: { $0.id == accentID }) { return preset.color }
         return Color(hexString: accentID) ?? AccentPreset.all[0].color
     }

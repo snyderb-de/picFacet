@@ -5,23 +5,23 @@ import SwiftUI
 /// The visual goal is a premium Mac utility: crisp hierarchy, native material,
 /// restrained color, and controls that look trustworthy around user files.
 enum PFDesign {
-    // MARK: Surfaces
-    static let canvas           = Color.adaptive(light: 0xF6F7F9, dark: 0x111418)
-    static let surfaceLow       = Color.adaptive(light: 0xECEFF3, dark: 0x1B2026)
-    static let surfaceLowest    = Color.adaptive(light: 0xFFFFFF, dark: 0x242A32)
-    static let surfaceHigh      = Color.adaptive(light: 0xDDE3EA, dark: 0x303842)
-    static let chrome           = Color.adaptive(light: 0xFBFCFE, dark: 0x181D23, alpha: 0.56)
+    // MARK: Surfaces (from the active color theme, see ColorThemes.swift)
+    static var canvas: Color           { .themed(\.canvas) }
+    static var surfaceLow: Color       { .themed(\.surfaceLow) }
+    static var surfaceLowest: Color    { .themed(\.surfaceLowest) }
+    static var surfaceHigh: Color      { .themed(\.surfaceHigh) }
+    static var chrome: Color           { .themed(\.chrome, alpha: 0.56) }
 
     // MARK: Ink
-    static let onSurface        = Color.adaptive(light: 0x161A1F, dark: 0xF5F7FA)
-    static let onSurfaceVariant = Color.adaptive(light: 0x5D6673, dark: 0xB7C0CC)
-    static let outlineVariant   = Color.adaptive(light: 0xBCC6D2, dark: 0x485360)
+    static var onSurface: Color        { .themed(\.onSurface) }
+    static var onSurfaceVariant: Color { .themed(\.onSurfaceVariant) }
+    static var outlineVariant: Color   { .themed(\.outlineVariant) }
 
     // MARK: Accent (user-chosen, see Theme)
     static var primary: Color { Theme.shared.accent }
     static var primaryBright: Color { primary.mix(with: .white, by: 0.3) }
-    static let success          = Color.adaptive(light: 0x0A7A4B, dark: 0x53D18C)
-    static let amber            = Color.adaptive(light: 0x9B5B00, dark: 0xF0B44D)
+    static var success: Color { .themed(\.success) }
+    static var amber: Color   { .themed(\.amber) }
     static var primaryGradient: LinearGradient {
         LinearGradient(colors: [primary, primaryBright], startPoint: .topLeading, endPoint: .bottomTrailing)
     }

@@ -127,6 +127,12 @@ public final class PicFacetSettings: @unchecked Sendable {
 
     // MARK: - Theme
 
+    /// Color theme id ("default", "dracula", …); the app maps it to a palette.
+    public var colorTheme: String {
+        get { defaults.string(forKey: Keys.colorTheme) ?? "default" }
+        set { defaults.set(newValue, forKey: Keys.colorTheme) }
+    }
+
     /// Accent colour: a preset name ("blue", "system", …) or "#RRGGBB".
     public var accentColor: String {
         get { defaults.string(forKey: Keys.accentColor) ?? "blue" }
@@ -157,6 +163,7 @@ public final class PicFacetSettings: @unchecked Sendable {
         static let defaultFormat             = "defaultFormat"
         static let defaultResizePercent      = "defaultResizePercent"
         static let defaultDPI                = "defaultDPI"
+        static let colorTheme                = "colorTheme"
         static let accentColor               = "accentColor"
         static let backdrop                  = "backdrop"
     }
