@@ -48,30 +48,12 @@ struct ChooserView: View {
     let onClose: () -> Void
 
     @State private var draft = OperationDraft.defaults()
-    @State private var thumbnails: [URL: NSImage] = [:]
+    @State private var summary = QueueSummary()
+    @State private var runStats = RunStats()
     /// (completed, total) while a run is in progress.
     @State private var progress: (completed: Int, total: Int)?
 
     var fileCount: Int { urls.count }
-
-    private var loadedThumbnail: NSImage? {
-        urls.lazy.compactMap { thumbnails[$0] }.first
-    }
-
-    private var formatSummary: String {
-        let formats = Set(urls.map { $0.pathExtension.uppercased() }.filter { !$0.isEmpty })
-        if formats.isEmpty { return "Images" }
-        if formats.count == 1, let format = formats.first { return format }
-        return "\(formats.count) formats"
-    }
-
-    private var totalSizeSummary: String {
-        let total = urls.reduce(Int64(0)) { partial, url in
-            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
-            return partial + size
-        }
-        return ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
-    }
 
     private var canStart: Bool { draft.selection != nil }
 
@@ -84,7 +66,7 @@ struct ChooserView: View {
             .padding(.top, 30)
             .padding(.bottom, 22)
 
-            PFStatusBar(status: "\(fileCount) image\(fileCount == 1 ? "" : "s") · \(totalSizeSummary)")
+            PFStatusBar(status: "\(fileCount) image\(fileCount == 1 ? "" : "s") · \(summary.sizeText)")
         }
         .frame(
             minWidth: Self.minSize.width,
@@ -95,9 +77,7 @@ struct ChooserView: View {
             maxHeight: .infinity
         )
         .background { PFDesign.backdrop }
-        .onAppear {
-            loadThumbnails()
-        }
+        .task(id: urls) { summary = await QueueSummary.load(urls) }
     }
 
     private var rootContent: some View {
@@ -128,30 +108,17 @@ struct ChooserView: View {
                 Text("Image Queue")
                     .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(PFDesign.onSurface)
-                Text("\(fileCount) image\(fileCount == 1 ? "" : "s") selected")
+                Text(isRunning ? "Processing…" : "\(fileCount) image\(fileCount == 1 ? "" : "s") ready")
                     .font(.system(size: 12))
                     .foregroundStyle(PFDesign.onSurfaceVariant)
             }
 
-            heroPreview
-
-            HStack(spacing: 8) {
-                PFStatPill(icon: "photo.stack", title: "Type", value: formatSummary)
-                PFStatPill(icon: "externaldrive", title: "Size", value: totalSizeSummary)
-            }
+            statsGrid
 
             ScrollView {
                 LazyVStack(spacing: 10) {
-                    ForEach(urls.prefix(12), id: \.self) { url in
+                    ForEach(urls, id: \.self) { url in
                         ImageQueueRow(url: url)
-                    }
-                    if urls.count > 12 {
-                        Text("+ \(urls.count - 12) more")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(PFDesign.onSurfaceVariant)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
                     }
                 }
             }
@@ -161,53 +128,28 @@ struct ChooserView: View {
         .pfContentPanel()
     }
 
-    private var heroPreview: some View {
-        ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(PFDesign.surfaceLow)
-
-            if let thumbnail = loadedThumbnail {
-                // Overlay on a clear shape so the image's own size can't
-                // widen the panel (an .aspectRatio(.fill) image would).
-                Color.clear
-                    .overlay {
-                        Image(nsImage: thumbnail)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .saturation(1.04)
-                    }
-                    .clipped()
+    /// Queue totals while idle; running totals while a batch is processing.
+    private var statsGrid: some View {
+        Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+            if isRunning {
+                GridRow {
+                    PFStatPill(icon: "checkmark.circle", title: "Done", value: runStats.doneText)
+                    PFStatPill(icon: "arrow.down.circle", title: runStats.savedTitle, value: runStats.savedText)
+                }
+                GridRow {
+                    PFStatPill(icon: "equal.circle", title: "Kept", value: "\(runStats.kept)")
+                    PFStatPill(icon: "exclamationmark.circle", title: "Failed", value: "\(runStats.failed)")
+                }
             } else {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 42, weight: .light))
-                    .foregroundStyle(PFDesign.onSurfaceVariant.opacity(0.48))
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(PFDesign.success)
-                Text("Ready")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(PFDesign.onSurface)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(PFDesign.chrome, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .padding(10)
-        }
-        .frame(height: 178)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(PFDesign.outlineVariant.opacity(0.2), lineWidth: 1)
-        }
-    }
-
-    private func loadThumbnails() {
-        for url in urls.prefix(12) {
-            Task {
-                thumbnails[url] = await Thumbnail.load(url, maxPixelSize: 840)
+                GridRow {
+                    PFStatPill(icon: "photo.stack", title: "Images", value: "\(fileCount)")
+                    PFStatPill(icon: "externaldrive", title: "Size", value: summary.sizeText)
+                }
+                GridRow {
+                    PFStatPill(icon: "doc.on.doc", title: "Formats", value: summary.formatsText)
+                        .help(summary.formatsDetail)
+                    PFStatPill(icon: "square.resize", title: "Pixels", value: summary.megapixelsText)
+                }
             }
         }
     }
@@ -261,10 +203,12 @@ struct ChooserView: View {
         let summary = draft.summary
         let policy = PicFacetSettings.shared.outputPolicy
         progress = (0, urls.count)
+        runStats = RunStats(total: urls.count)
 
         Task {
             let result = await ImageProcessor.process(urls, selection, policy: policy) { p in
                 progress = (p.completed, p.total)
+                runStats.add(p.latest)
             }
             NSLog("[PicFacet] done ok=%d kept=%d failed=%d",
                   result.succeeded.count, result.keptOriginal.count, result.failed.count)
