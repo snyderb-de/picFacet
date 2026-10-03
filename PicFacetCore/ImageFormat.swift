@@ -1,4 +1,6 @@
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 public enum ImageFormat: String, CaseIterable, Sendable {
     case jpeg
@@ -60,8 +62,22 @@ public enum ImageFormat: String, CaseIterable, Sendable {
 // MARK: - URL helpers
 
 public extension URL {
-    /// True if the file extension is a supported image format.
+    /// True if ImageIO can read this file type: the seven formats PicFacet writes
+    /// plus anything else the system decodes (RAW, AVIF, JPEG 2000, ICO, PSD…).
+    /// Decided from the extension only, so it is cheap to call on every drop.
     var isImageFile: Bool {
-        ImageFormat(fileExtension: pathExtension) != nil
+        if ImageFormat(fileExtension: pathExtension) != nil { return true }
+        guard !pathExtension.isEmpty,
+              let type = UTType(filenameExtension: pathExtension) else { return false }
+        return ImageReadableTypes.all.contains { type.conforms(to: $0) }
     }
+}
+
+/// The types ImageIO can decode on this Mac, so unreadable "images" such as
+/// SVG (which conforms to public.image) are not accepted.
+private enum ImageReadableTypes {
+    static let all: [UTType] = {
+        let ids = (CGImageSourceCopyTypeIdentifiers() as? [String]) ?? []
+        return ids.compactMap { UTType($0) }
+    }()
 }

@@ -37,6 +37,11 @@ public struct OutputPolicy: Sendable {
     public var onlyIfSmaller: Bool
     public var deleteOriginalAfterConvert: Bool
     public var isProportional: Bool
+    /// Sources PicFacet can read but not write (RAW, AVIF, ICO…) have no
+    /// "same format" to resize or re-tag into. When true they are saved as
+    /// JPEG beside the original; when false such files fail with an
+    /// explanation unless the run also picks a Convert format.
+    public var saveUnsupportedAsJPEG: Bool
     /// nil = same folder as source
     public var customOutputFolder: URL?
 
@@ -45,12 +50,14 @@ public struct OutputPolicy: Sendable {
         onlyIfSmaller: Bool = false,
         deleteOriginalAfterConvert: Bool = false,
         isProportional: Bool = true,
+        saveUnsupportedAsJPEG: Bool = false,
         customOutputFolder: URL? = nil
     ) {
         self.overwriteSource = overwriteSource
         self.onlyIfSmaller = onlyIfSmaller
         self.deleteOriginalAfterConvert = deleteOriginalAfterConvert
         self.isProportional = isProportional
+        self.saveUnsupportedAsJPEG = saveUnsupportedAsJPEG
         self.customOutputFolder = customOutputFolder
     }
 }
@@ -104,7 +111,16 @@ public enum ImageProcessor {
 
         let originalBytes = FileOutputManager.fileSize(url)
         var (image, properties) = try ConversionEngine.readImage(from: url)
-        let targetFormat = selection.format ?? ImageFormat(fileExtension: url.pathExtension) ?? .jpeg
+        // Sources PicFacet can't write (RAW, AVIF, ICO…) have no same-format
+        // output. With the policy on they are saved as JPEG beside the original,
+        // which is never overwritten or deleted unless a Convert target was chosen.
+        let sourceFormat = ImageFormat(fileExtension: url.pathExtension)
+        if sourceFormat == nil && selection.format == nil && !policy.saveUnsupportedAsJPEG {
+            throw PicFacetError.customError(
+                "PicFacet can't write .\(url.pathExtension.lowercased()) files. Choose a Convert format, or turn on “Save unsupported formats as JPEG” in Settings.")
+        }
+        let targetFormat = selection.format ?? sourceFormat ?? .jpeg
+        let changesFormat = selection.format != nil || sourceFormat == nil
         var needsWrite = selection.format != nil
 
         if let resize = selection.resize {
@@ -122,9 +138,9 @@ public enum ImageProcessor {
             return FileReport(source: url, outcome: .keptOriginal, originalBytes: originalBytes)
         }
 
-        let output = selection.format.map {
-            FileOutputManager.outputURL(for: url, targetFormat: $0, policy: policy)
-        } ?? FileOutputManager.outputURL(for: url, policy: policy)
+        let output = changesFormat
+            ? FileOutputManager.outputURL(for: url, targetFormat: targetFormat, policy: policy)
+            : FileOutputManager.outputURL(for: url, policy: policy)
 
         // Write beside the output first: the source must survive until the
         // size check passes, even when the output replaces it.
@@ -134,7 +150,7 @@ public enum ImageProcessor {
         let resultBytes = FileOutputManager.fileSize(staged)
 
         // DPI-only edits are metadata changes, so the size rule does not apply.
-        let changesPixelsOrFormat = selection.format != nil || selection.resize != nil
+        let changesPixelsOrFormat = changesFormat || selection.resize != nil
         if policy.onlyIfSmaller && changesPixelsOrFormat && resultBytes >= originalBytes {
             return FileReport(source: url, outcome: .keptOriginal,
                               originalBytes: originalBytes, resultBytes: resultBytes)

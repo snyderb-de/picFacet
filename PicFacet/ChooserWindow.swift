@@ -125,7 +125,7 @@ struct ChooserView: View {
     private var selectedFilesPanel: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Source Set")
+                Text("Image Queue")
                     .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(PFDesign.onSurface)
                 Text("\(fileCount) image\(fileCount == 1 ? "" : "s") selected")
@@ -143,7 +143,7 @@ struct ChooserView: View {
             ScrollView {
                 LazyVStack(spacing: 10) {
                     ForEach(urls.prefix(12), id: \.self) { url in
-                        filePreviewRow(for: url)
+                        ImageQueueRow(url: url)
                     }
                     if urls.count > 12 {
                         Text("+ \(urls.count - 12) more")
@@ -204,43 +204,6 @@ struct ChooserView: View {
         }
     }
 
-    private func filePreviewRow(for url: URL) -> some View {
-        HStack(spacing: 10) {
-            if let thumbnail = thumbnails[url] {
-                Image(nsImage: thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(PFDesign.outlineVariant.opacity(0.2), lineWidth: 1)
-                    }
-            } else {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(PFDesign.surfaceLow)
-                    .frame(width: 44, height: 44)
-                    .overlay {
-                        Image(systemName: "photo")
-                            .font(.system(size: 14))
-                            .foregroundStyle(PFDesign.onSurfaceVariant.opacity(0.5))
-                    }
-            }
-
-            Text(url.lastPathComponent)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(PFDesign.onSurface)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(9)
-        .background(PFDesign.surfaceLow, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(PFDesign.outlineVariant.opacity(0.12), lineWidth: 1)
-        }
-    }
-    
     private func loadThumbnails() {
         for url in urls.prefix(12) {
             Task {
@@ -252,18 +215,9 @@ struct ChooserView: View {
     // MARK: Header
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("PicFacet")
-                    .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(PFDesign.onSurface)
-
-                Text("Production-ready image prep")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(PFDesign.onSurfaceVariant)
-            }
-
-        }
+        Text("PicFacet")
+            .font(.system(size: 30, weight: .semibold))
+            .foregroundStyle(PFDesign.onSurface)
     }
 
     // MARK: Sections
@@ -272,10 +226,6 @@ struct ChooserView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
                 PFSectionLabel(text: "Processing Options")
-                Spacer()
-                Text("Format → Resize → DPI")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(PFDesign.onSurfaceVariant)
             }
 
             OperationMenus(draft: $draft, labelWidth: 170, menuWidth: 220, showsDetails: true)

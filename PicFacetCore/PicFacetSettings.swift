@@ -42,6 +42,13 @@ public final class PicFacetSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: Keys.deleteOriginalAfterConvert) }
     }
 
+    /// Off by default: resizing or re-tagging a format PicFacet can't write
+    /// (RAW, AVIF, ICO…) is refused instead of silently producing a JPEG.
+    public var saveUnsupportedAsJPEG: Bool {
+        get { defaults.bool(forKey: Keys.saveUnsupportedAsJPEG) }
+        set { defaults.set(newValue, forKey: Keys.saveUnsupportedAsJPEG) }
+    }
+
     // MARK: - Resize
 
     public var isProportional: Bool {
@@ -70,6 +77,7 @@ public final class PicFacetSettings: @unchecked Sendable {
             onlyIfSmaller: onlyIfSmaller,
             deleteOriginalAfterConvert: deleteOriginalAfterConvert,
             isProportional: isProportional,
+            saveUnsupportedAsJPEG: saveUnsupportedAsJPEG,
             customOutputFolder: customOutputFolder.map { URL(fileURLWithPath: $0, isDirectory: true) }
         )
     }
@@ -141,6 +149,7 @@ public final class PicFacetSettings: @unchecked Sendable {
         static let overwriteSource           = "overwriteSource"
         static let onlyIfSmaller             = "onlyIfSmaller"
         static let deleteOriginalAfterConvert = "deleteOriginalAfterConvert"
+        static let saveUnsupportedAsJPEG     = "saveUnsupportedAsJPEG"
         static let isProportional            = "isProportional"
         static let resizePresets             = "resizePresets"
         static let customOutputFolder        = "customOutputFolder"

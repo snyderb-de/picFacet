@@ -188,7 +188,7 @@ struct BatchView: View {
         VStack(spacing: 0) {
             // List header
             HStack {
-                Text("Files")
+                Text("Image Queue")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(PFDesign.onSurfaceVariant)
                     .textCase(.uppercase)
@@ -211,7 +211,7 @@ struct BatchView: View {
             ScrollView {
                 LazyVStack(spacing: 8) {
                     ForEach(files) { file in
-                        FileItemRow(item: file)
+                        ImageQueueRow(url: file.url)
                     }
                 }
             }
@@ -276,7 +276,7 @@ struct BatchView: View {
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
         for provider in providers {
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url, !url.hasDirectoryPath else { return }
+                guard let url, !url.hasDirectoryPath, url.isImageFile else { return }
                 Task { @MainActor in
                     files.append(FileItem(url: url))
                 }
@@ -325,71 +325,6 @@ struct BatchView: View {
 struct FileItem: Identifiable {
     let id = UUID()
     let url: URL
-}
-
-// MARK: - File Item Row
-
-struct FileItemRow: View {
-    let item: FileItem
-    @State private var thumbnail: NSImage?
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Thumbnail
-            if let thumbnail {
-                Image(nsImage: thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 40, height: 40)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(PFDesign.outlineVariant.opacity(0.2), lineWidth: 1)
-                    }
-            } else {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(PFDesign.surfaceLow)
-                    .frame(width: 40, height: 40)
-                    .overlay {
-                        Image(systemName: "photo")
-                            .font(.system(size: 16))
-                            .foregroundStyle(PFDesign.onSurfaceVariant.opacity(0.5))
-                    }
-            }
-            
-            // File info
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.url.lastPathComponent)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(PFDesign.onSurface)
-                    .lineLimit(1)
-                
-                if let fileSize = try? item.url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
-                    Text(ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file))
-                        .font(.system(size: 10))
-                        .foregroundStyle(PFDesign.onSurfaceVariant)
-                }
-            }
-            
-            Spacer()
-        }
-        .padding(10)
-        .modifier(RowBackgroundModifier())
-        .task(id: item.url) {
-            thumbnail = await Thumbnail.load(item.url, maxPixelSize: 80)
-        }
-    }
-}
-
-private struct RowBackgroundModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .background(PFDesign.surfaceLowest, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(PFDesign.outlineVariant.opacity(0.1), lineWidth: 1)
-            }
-    }
 }
 
 // MARK: - Previews

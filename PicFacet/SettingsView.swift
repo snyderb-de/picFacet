@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var overwriteSource: Bool = PicFacetSettings.shared.overwriteSource
     @State private var onlyIfSmaller: Bool = PicFacetSettings.shared.onlyIfSmaller
     @State private var deleteOriginalAfterConvert: Bool = PicFacetSettings.shared.deleteOriginalAfterConvert
+    @State private var saveUnsupportedAsJPEG: Bool = PicFacetSettings.shared.saveUnsupportedAsJPEG
     @State private var isProportional: Bool = PicFacetSettings.shared.isProportional
     @State private var defaultFormat: ImageFormat? = PicFacetSettings.shared.defaultFormat
     @State private var defaultResizePercent: Int? = PicFacetSettings.shared.defaultResizePercent
@@ -183,6 +184,12 @@ struct SettingsView: View {
                     Text("Remove the source file once the new one is saved.")
                 }
                 .onChange(of: deleteOriginalAfterConvert) { _, new in PicFacetSettings.shared.deleteOriginalAfterConvert = new }
+
+                Toggle(isOn: $saveUnsupportedAsJPEG) {
+                    Text("Save unsupported formats as JPEG")
+                    Text("RAW, AVIF, ICO and other formats PicFacet can read but not write. When resizing or changing DPI, save a JPEG beside the original instead of skipping the file. Choosing a Convert format always works.")
+                }
+                .onChange(of: saveUnsupportedAsJPEG) { _, new in PicFacetSettings.shared.saveUnsupportedAsJPEG = new }
             }
 
             Section("Resize") {

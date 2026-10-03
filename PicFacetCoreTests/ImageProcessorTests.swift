@@ -98,3 +98,54 @@ import Testing
         #expect(draft.selection == BatchSelection(resize: .percent(33), dpi: 300))
     }
 }
+
+@Suite struct ImageQueueAcceptanceTests {
+    @Test func acceptsAnyReadableImageButNotOtherFiles() {
+        for name in ["a.jpg", "a.PNG", "a.heic", "a.tif", "a.ico", "a.jp2", "a.psd"] {
+            #expect(URL(fileURLWithPath: "/tmp/\(name)").isImageFile, "\(name)")
+        }
+        for name in ["a.txt", "a.pdf", "a.svg", "a.mov", "noextension"] {
+            #expect(!URL(fileURLWithPath: "/tmp/\(name)").isImageFile, "\(name)")
+        }
+    }
+
+    /// With the option on, a readable source PicFacet can't write must not be
+    /// overwritten with JPEG bytes under its own extension.
+    @Test func unwritableSourceIsSavedAsJpegBesideTheOriginal() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PicFacetTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        // Write a PNG, then give it an extension ImageFormat doesn't know but ImageIO reads.
+        let png = try Fixture.image(at: dir.appendingPathComponent("a.png"), width: 40, height: 40)
+        let source = dir.appendingPathComponent("a.jp2")
+        try FileManager.default.moveItem(at: png, to: source)
+
+        let result = await ImageProcessor.process([source], BatchSelection(resize: .percent(50)),
+                                                  policy: OutputPolicy(overwriteSource: true, saveUnsupportedAsJPEG: true))
+
+        #expect(result.succeeded.count == 1)
+        #expect(try Fixture.files(in: dir) == ["a.jp2", "a.jpg"])
+    }
+
+    /// Default (option off): resize-only on an unwritable source fails and writes nothing.
+    @Test func unwritableSourceFailsWhenOptionIsOff() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PicFacetTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let png = try Fixture.image(at: dir.appendingPathComponent("a.png"), width: 40, height: 40)
+        let source = dir.appendingPathComponent("a.jp2")
+        try FileManager.default.moveItem(at: png, to: source)
+
+        let resizeOnly = await ImageProcessor.process([source], BatchSelection(resize: .percent(50)), policy: OutputPolicy())
+        #expect(resizeOnly.failed.count == 1)
+        #expect(try Fixture.files(in: dir) == ["a.jp2"])
+
+        // An explicit Convert target works regardless of the option.
+        let converted = await ImageProcessor.process([source], BatchSelection(format: .png), policy: OutputPolicy())
+        #expect(converted.succeeded.count == 1)
+    }
+}
