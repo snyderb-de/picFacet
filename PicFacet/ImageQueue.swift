@@ -59,9 +59,6 @@ struct ImageQueueRow: View {
 
     @State private var thumbnail: NSImage?
     @State private var info: ImageInfo?
-    @State private var hoverTask: Task<Void, Never>?
-    @State private var showPreview = false
-    @State private var preview: NSImage?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -91,26 +88,6 @@ struct ImageQueueRow: View {
         .overlay {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(PFDesign.outlineVariant.opacity(0.12), lineWidth: 1)
-        }
-        .onHover { inside in
-            hoverTask?.cancel()
-            guard inside else { showPreview = false; return }
-            // Short delay so sweeping the mouse down the list doesn't flash popovers.
-            hoverTask = Task {
-                try? await Task.sleep(for: .milliseconds(450))
-                guard !Task.isCancelled else { return }
-                if preview == nil { preview = await Thumbnail.load(url, maxPixelSize: 900) }
-                if !Task.isCancelled { showPreview = preview != nil }
-            }
-        }
-        .popover(isPresented: $showPreview, arrowEdge: .trailing) {
-            if let preview {
-                Image(nsImage: preview)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: 420, maxHeight: 420)
-                    .padding(8)
-            }
         }
         .task(id: url) {
             async let loadedInfo = ImageInfo.load(url)
