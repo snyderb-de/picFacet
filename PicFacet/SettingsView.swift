@@ -24,6 +24,13 @@ struct SettingsView: View {
     @State private var backgroundStatus = BackgroundWatching.status
     @State private var backgroundError: String?
     @State private var isConfirmingDelete = false
+    /// The recipe being edited in the sheet; a fresh, unsaved one for "New Recipe".
+    @State private var editingRecipe: EditingRecipe?
+
+    private struct EditingRecipe: Identifiable {
+        let id = UUID()
+        let recipe: Recipe?
+    }
 
     var body: some View {
         Form {
@@ -227,7 +234,7 @@ struct SettingsView: View {
 
             Section {
                 if recipes.isEmpty {
-                    Text("Set up options in the Chooser or Batch window, then choose Recipes → Save Current as Recipe…")
+                    Text("No recipes yet. Create one here, or save the current options from the Chooser or Batch window (Recipes → Save Current as Recipe…).")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
@@ -245,6 +252,11 @@ struct SettingsView: View {
                                 .lineLimit(2)
                         }
                         Spacer()
+                        Button { editingRecipe = EditingRecipe(recipe: recipe) } label: {
+                            Image(systemName: "pencil")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Edit recipe")
                         Button(role: .destructive) { RecipeStore.delete(recipe.id) } label: {
                             Image(systemName: "trash")
                         }
@@ -252,6 +264,7 @@ struct SettingsView: View {
                         .help("Delete recipe")
                     }
                 }
+                Button("New Recipe…") { editingRecipe = EditingRecipe(recipe: nil) }
             } header: {
                 Text("Recipes")
             } footer: {
@@ -338,6 +351,9 @@ struct SettingsView: View {
                 }
                 .onChange(of: notifyAfterRuns) { _, new in PicFacetSettings.shared.notifyAfterRuns = new }
             }
+        }
+        .sheet(item: $editingRecipe) { item in
+            RecipeEditorSheet(recipe: item.recipe)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // The user may have approved the login item in System Settings.
