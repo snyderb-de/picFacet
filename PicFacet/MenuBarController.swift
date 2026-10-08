@@ -12,6 +12,10 @@ final class MenuBarController {
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        // A stable name lets macOS remember where the user (or a menu bar
+        // manager like Bartender) put the icon. Without it every launch is a
+        // new item and lands at the end of the list. Never change this string.
+        statusItem.autosaveName = "PicFacetStatusItem"
         
         NSLog("[MenuBar] Initializing menu bar...")
         

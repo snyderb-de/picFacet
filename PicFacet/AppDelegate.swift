@@ -37,6 +37,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         print("========================================")
     }
 
+    /// Double-clicking the app while it runs. It has no Dock icon or window,
+    /// and its menu bar icon may be hidden (e.g. by Bartender), so open the
+    /// Batch window rather than appear to do nothing.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { BatchWindowController.shared.show() }
+        return true
+    }
+
     /// Most paths a single `picfacet://` link may carry. Real Finder selections
     /// can be large; this only stops an absurd link from building a huge list.
     private static let maxLinkedPaths = 500

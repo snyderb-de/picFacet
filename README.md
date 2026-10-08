@@ -127,7 +127,9 @@ nix shell nixpkgs#xcodegen -c xcodegen generate
 
 In Xcode: select the **PicFacet** target → **Signing & Capabilities** → set your Team (free Personal Team is fine for local testing). Then **⌘R**.
 
-`build_and_run.sh` signs with your **Apple Development** certificate when one is installed (team read from the certificate, or set `TEAM_ID`), so background folder watching works locally. `UNSIGNED=1` builds unsigned (background watching then off). `ALLOW_PROVISIONING=1` lets Xcode create or refresh App IDs and profiles on your developer account; it's only needed after adding a target or capability.
+`build_and_run.sh` installs the build to **/Applications/PicFacet.app** and launches it from there (`NO_INSTALL=1` runs it from the build folder instead). On macOS 27 the menu bar, and menu bar managers like Bartender, only handle an app's icon properly when the app runs from Applications.
+
+It also signs with your **Apple Development** certificate when one is installed (team read from the certificate, or set `TEAM_ID`), so background folder watching works locally. `UNSIGNED=1` builds unsigned (background watching then off). `ALLOW_PROVISIONING=1` lets Xcode create or refresh App IDs and profiles on your developer account; it's only needed after adding a target or capability.
 
 ### First launch
 

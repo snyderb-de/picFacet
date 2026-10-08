@@ -44,6 +44,21 @@ xcodebuild \
   build \
   "${SIGN_ARGS[@]}"
 
+# Install into /Applications and run from there. On macOS 27 the menu bar
+# (and menu bar managers like Bartender) only handle status items properly for
+# apps run from Applications, and a single installed copy keeps Finder's
+# Quick Actions and the login item pointing at this build.
+#   NO_INSTALL=1   run straight from the build folder instead
+if [[ "${NO_INSTALL:-0}" != "1" ]]; then
+  INSTALLED="/Applications/$APP_NAME.app"
+  pkill -x PicFacetWatcher >/dev/null 2>&1 || true
+  rm -rf "/Applications/PicFacet.app"
+  ditto "$APP_BUNDLE" "$INSTALLED"
+  APP_BUNDLE="$INSTALLED"
+  APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+  echo "Installed $INSTALLED"
+fi
+
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
 }
