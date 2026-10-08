@@ -68,4 +68,24 @@ import Testing
         settings.defaultResizePercent = 33
         #expect(OperationDraft.defaults(from: settings).resizeMode == .percent(50))
     }
+
+    @Test func migrationCopiesOnlyMissingKeysOnce() {
+        let legacyName = "com.picfacet.tests.legacy"
+        let legacy = UserDefaults(suiteName: legacyName)!
+        legacy.removePersistentDomain(forName: legacyName)
+        defer { legacy.removePersistentDomain(forName: legacyName) }
+        legacy.set(true, forKey: "overwriteSource")
+        legacy.set("dracula", forKey: "colorTheme")
+        legacy.set("not ours", forKey: "someOtherAppKey")
+
+        settings.colorTheme = "nord"  // already set here: kept
+        settings.migrate(from: legacy)
+        #expect(settings.overwriteSource)
+        #expect(settings.colorTheme == "nord")
+
+        legacy.set(false, forKey: "overwriteSource")
+        settings.overwriteSource = false
+        settings.migrate(from: legacy)  // second run does nothing
+        #expect(!settings.overwriteSource)
+    }
 }

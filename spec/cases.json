@@ -10,9 +10,19 @@
       { "command": "height:600", "selection": { "resize": { "height": 600 } } },
       { "command": "dpi:300", "selection": { "dpi": 300 } },
       { "command": "convert:png;resize:25%;dpi:72", "selection": { "format": "png", "resize": { "percent": 25 }, "dpi": 72 } },
-      { "command": " convert : webp ", "selection": { "format": "webp" } }
+      { "command": " convert : webp ", "selection": { "format": "webp" } },
+      { "command": "convert:avif", "selection": { "format": "avif" } },
+      { "command": "longedge:1920", "selection": { "resize": { "longEdge": 1920 } } },
+      { "command": "quality:80", "selection": { "quality": 80 } },
+      { "command": "target:500kb", "selection": { "maxBytes": 500000 } },
+      { "command": "target:2MB", "selection": { "maxBytes": 2000000 } },
+      { "command": "metadata:location", "selection": { "metadata": "location" } },
+      { "command": "metadata:all", "selection": { "metadata": "all" } },
+      { "command": "crop:16:9", "selection": { "crop": "16:9" } },
+      { "command": "longedge:2048;quality:75;metadata:location", "selection": { "resize": { "longEdge": 2048 }, "quality": 75, "metadata": "location" } }
     ],
-    "invalid": ["", "convert", "convert:psd", "resize:50", "resize:0%", "width:-1", "dpi:abc", "rotate:90", "convert:png;bogus"]
+    "invalid": ["", "convert", "convert:psd", "resize:50", "resize:0%", "width:-1", "dpi:abc", "rotate:90", "convert:png;bogus",
+                "longedge:0", "quality:0", "quality:101", "target:500", "target:kb", "metadata:some", "crop:16", "crop:0:1"]
   },
 
   "pipeline": [
@@ -107,6 +117,91 @@
       "source": { "name": "photo.png", "width": 200, "height": 100 },
       "selection": { "dpi": 150 }, "policy": { "customOutputFolder": "out" },
       "expect": { "files": ["out/photo.png", "photo.png"], "result": "out/photo.png", "dpi": 150 }
+    },
+    {
+      "name": "long edge fits the longer side",
+      "source": { "name": "photo.png", "width": 400, "height": 200 },
+      "selection": { "resize": { "longEdge": 100 } }, "policy": {},
+      "expect": { "result": "photo-picfacet.png", "pixels": [100, 50] }
+    },
+    {
+      "name": "long edge never enlarges",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "resize": { "longEdge": 1000 } }, "policy": {},
+      "expect": { "result": "photo-picfacet.png", "pixels": [200, 100] }
+    },
+    {
+      "name": "crop keeps the centre at the ratio",
+      "source": { "name": "photo.png", "width": 300, "height": 100 },
+      "selection": { "crop": "1:1" }, "policy": {},
+      "expect": { "result": "photo-picfacet.png", "pixels": [100, 100] }
+    },
+    {
+      "name": "crop runs before resize",
+      "source": { "name": "photo.png", "width": 400, "height": 200 },
+      "selection": { "crop": "1:1", "resize": { "longEdge": 50 } }, "policy": {},
+      "expect": { "result": "photo-picfacet.png", "pixels": [50, 50] }
+    },
+    {
+      "name": "rename pattern names the output",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "format": "jpeg", "rename": "{name}-{width}w" }, "policy": {},
+      "expect": { "files": ["photo-200w.jpg", "photo.png"], "result": "photo-200w.jpg" }
+    },
+    {
+      "name": "rename alone copies the file",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "rename": "img-{n}" }, "policy": {},
+      "expect": { "files": ["img-01.png", "photo.png"], "result": "img-01.png", "sourceUnchanged": true }
+    },
+    {
+      "name": "rename alone moves the file when overwriting",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "rename": "img-{n}" }, "policy": { "overwriteSource": true },
+      "expect": { "files": ["img-01.png"], "result": "img-01.png" }
+    },
+    {
+      "name": "rename never overwrites an existing file",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "existing": ["img.png"],
+      "selection": { "resize": { "percent": 50 }, "rename": "img" }, "policy": {},
+      "expect": { "files": ["img-1.png", "img.png", "photo.png"], "result": "img-1.png", "pixels": [100, 50] }
+    },
+    {
+      "name": "convert to avif",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "format": "avif" }, "policy": {},
+      "expect": { "files": ["photo.avif", "photo.png"], "result": "photo.avif", "pixels": [200, 100] }
+    },
+    {
+      "name": "convert to webp",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "format": "webp" }, "policy": {},
+      "expect": { "files": ["photo.png", "photo.webp"], "result": "photo.webp", "pixels": [200, 100] }
+    },
+    {
+      "name": "webp target size searches quality",
+      "source": { "name": "photo.png", "width": 400, "height": 400, "noisy": true },
+      "selection": { "format": "webp", "maxBytes": 30000 }, "policy": {},
+      "expect": { "result": "photo.webp", "maxBytes": 30000 }
+    },
+    {
+      "name": "convert to pdf",
+      "source": { "name": "photo.png", "width": 200, "height": 100 },
+      "selection": { "format": "pdf" }, "policy": {},
+      "expect": { "files": ["photo.pdf", "photo.png"], "result": "photo.pdf" }
+    },
+    {
+      "name": "target size is met",
+      "source": { "name": "photo.jpg", "width": 400, "height": 400, "noisy": true },
+      "selection": { "maxBytes": 20000 }, "policy": {},
+      "expect": { "result": "photo-picfacet.jpg", "maxBytes": 20000 }
+    },
+    {
+      "name": "target size downscales a lossless format",
+      "source": { "name": "photo.png", "width": 400, "height": 400, "noisy": true },
+      "selection": { "maxBytes": 60000 }, "policy": {},
+      "expect": { "result": "photo-picfacet.png", "maxBytes": 60000 }
     }
   ]
 }

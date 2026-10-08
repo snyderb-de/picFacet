@@ -1,10 +1,12 @@
 import Foundation
 import CoreGraphics
 
-public enum ResizeOperation: Hashable, Sendable {
+public enum ResizeOperation: Hashable, Codable, Sendable {
     case percent(Int)
     case width(Int)
     case height(Int)
+    /// Fit the longer side within this many pixels. Never enlarges.
+    case longEdge(Int)
 
     public var displayName: String {
         switch self {
@@ -14,6 +16,8 @@ public enum ResizeOperation: Hashable, Sendable {
             return "Set width to \(width) px"
         case .height(let height):
             return "Set height to \(height) px"
+        case .longEdge(let edge):
+            return "Fit within \(edge) px"
         }
     }
 }
@@ -24,19 +28,7 @@ struct ResizeEngine {
 
     /// Resamples cgImage to newSize using high-quality Lanczos interpolation via CGContext.
     static func resize(_ cgImage: CGImage, toSize size: CGSize) throws -> CGImage {
-        let colorSpace = cgImage.colorSpace ?? CGColorSpaceCreateDeviceRGB()
-
-        // Always render at 8bpc premultiplied — covers JPEG, PNG, WebP, HEIC.
-        // 16-bit TIFFs are intentionally downsampled; add 16bpc path later if needed.
-        guard let ctx = CGContext(
-            data: nil,
-            width: Int(size.width),
-            height: Int(size.height),
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
+        guard let ctx = Canvas.make(width: Int(size.width), height: Int(size.height), like: cgImage) else {
             throw PicFacetError.resizeFailed
         }
 
@@ -59,6 +51,10 @@ struct ResizeEngine {
             return size(for: image, maxWidth: width, proportional: proportional)
         case .height(let height):
             return size(for: image, maxHeight: height, proportional: proportional)
+        case .longEdge(let edge):
+            let long = max(image.width, image.height)
+            guard long > edge else { return CGSize(width: image.width, height: image.height) }
+            return size(for: image, byPercent: Double(edge) / Double(long) * 100)
         }
     }
 
@@ -84,5 +80,22 @@ struct ResizeEngine {
         let scale = CGFloat(height) / CGFloat(image.height)
         return CGSize(width: CGFloat(image.width) * scale,
                       height: CGFloat(height))
+    }
+}
+
+/// 8-bit RGBA bitmap contexts for drawing. Keeps the source's colour space when
+/// it is RGB; indexed (GIF), grey and CMYK sources draw into sRGB, since
+/// CGContext can't render RGBA into those.
+enum Canvas {
+    static func make(width: Int, height: Int, like image: CGImage) -> CGContext? {
+        guard width > 0, height > 0 else { return nil }
+        var space = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        if space.model != .rgb { space = CGColorSpace(name: CGColorSpace.sRGB)! }
+        // 16-bit TIFFs are intentionally downsampled to 8bpc.
+        return CGContext(
+            data: nil, width: width, height: height,
+            bitsPerComponent: 8, bytesPerRow: 0, space: space,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
     }
 }

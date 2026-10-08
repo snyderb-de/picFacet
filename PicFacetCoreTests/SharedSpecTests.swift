@@ -20,19 +20,29 @@ import Testing
     }
 
     struct SelectionSpec: Decodable {
-        struct Resize: Decodable { let percent: Int?; let width: Int?; let height: Int? }
+        struct Resize: Decodable { let percent: Int?; let width: Int?; let height: Int?; let longEdge: Int? }
         let format: String?
         let resize: Resize?
         let dpi: Int?
+        let quality: Int?
+        let maxBytes: Int?
+        let metadata: String?
+        let crop: String?
+        let rename: String?
 
         var selection: BatchSelection {
             let resizeOp: ResizeOperation? = resize.flatMap { r in
                 if let p = r.percent { return .percent(p) }
                 if let w = r.width { return .width(w) }
                 if let h = r.height { return .height(h) }
+                if let e = r.longEdge { return .longEdge(e) }
                 return nil
             }
-            return BatchSelection(format: format.flatMap { ImageFormat(fileExtension: $0) }, resize: resizeOp, dpi: dpi)
+            return BatchSelection(
+                format: format.flatMap { ImageFormat(fileExtension: $0) }, resize: resizeOp, dpi: dpi,
+                quality: quality, maxBytes: maxBytes, metadata: metadata.flatMap(MetadataMode.init(rawValue:)),
+                crop: crop.flatMap { CropRatio(label: $0) }, rename: rename.map(RenamePattern.init)
+            )
         }
     }
 
@@ -53,6 +63,8 @@ import Testing
             let pixels: [Int]?
             let dpi: Int?
             let sourceUnchanged: Bool?
+            /// The output is at most this many bytes.
+            let maxBytes: Int?
         }
         let name: String
         let source: Source
@@ -142,6 +154,10 @@ import Testing
             let (_, props) = try ConversionEngine.readImage(from: output)
             #expect((props[kCGImagePropertyDPIWidth as String] as? Double)?.rounded() == Double(dpi))
             #expect((props[kCGImagePropertyDPIHeight as String] as? Double)?.rounded() == Double(dpi))
+        }
+        if let maxBytes = c.expect.maxBytes {
+            #expect(FileOutputManager.fileSize(output) <= maxBytes)
+            #expect(report.note == nil)
         }
         if c.expect.sourceUnchanged == true {
             #expect(try Data(contentsOf: source) == before)

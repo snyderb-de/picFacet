@@ -2,10 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>com.apple.security.app-sandbox</key>
-    <true/>
-    <!-- Read-only use: the recipe list and run token the app keeps in its
-         shared defaults, for the Recipes submenu. -->
+    <!-- Like the main app: unsandboxed for direct distribution, sharing
+         settings (recipes, watched folders) through the App Group. -->
     <key>com.apple.security.application-groups</key>
     <array>
         <string>$(TeamIdentifierPrefix)com.picfacet.shared</string>

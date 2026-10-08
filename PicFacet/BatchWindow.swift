@@ -24,8 +24,8 @@ final class BatchWindowController {
             win.title = "PicFacet Processing"
             win.isReleasedWhenClosed = false
             win.backgroundColor = .windowBackgroundColor
-            win.setContentSize(NSSize(width: 880, height: 720))
-            win.minSize = NSSize(width: 780, height: 640)
+            win.setContentSize(NSSize(width: 920, height: 760))
+            win.minSize = NSSize(width: 820, height: 680)
             win.center()
             window = win
         } else {
@@ -68,11 +68,11 @@ struct BatchView: View {
             PFStatusBar(status: files.isEmpty ? "" : "\(files.count) image\(files.count == 1 ? "" : "s")")
         }
         .frame(
-            minWidth: 780,
-            idealWidth: 880,
+            minWidth: 820,
+            idealWidth: 920,
             maxWidth: .infinity,
-            minHeight: 640,
-            idealHeight: 720,
+            minHeight: 680,
+            idealHeight: 760,
             maxHeight: .infinity
         )
         .background { PFDesign.backdrop }
@@ -95,13 +95,15 @@ struct BatchView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             VStack(spacing: 22) {
+                // Options come first; the activity log takes what is left.
                 controlsView
+                    .layoutPriority(1)
                 ActivityLogView(runs: activity) { activity.removeAll() }
                     .padding(22)
-                    .frame(maxHeight: .infinity, alignment: .top)
+                    .frame(minHeight: 150, maxHeight: .infinity, alignment: .top)
                     .pfPanel()
             }
-            .frame(width: 310)
+            .frame(width: 350)
         }
     }
     
@@ -229,13 +231,16 @@ struct BatchView: View {
                 HStack {
                     PFSectionLabel(text: "Processing Options")
                     Spacer()
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(PFDesign.primary)
+                    RecipeMenu(draft: $draft)
+                        .disabled(isProcessing)
                 }
-                
-                OperationMenus(draft: $draft)
-                    .disabled(isProcessing)
+
+                ScrollView {
+                    OperationMenus(draft: $draft, labelWidth: 78)
+                        .disabled(isProcessing)
+                        .padding(.trailing, 4)
+                }
+                .frame(minHeight: 200, idealHeight: 420, maxHeight: 420)
 
                 PFRunBar(
                     summary: draft.summary,
@@ -262,8 +267,8 @@ struct BatchView: View {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.allowedContentTypes = [.image]
-        panel.message = "Select images to process"
+        panel.allowedContentTypes = [.image, .pdf]
+        panel.message = "Select images or PDFs to process"
         
         panel.begin { response in
             if response == .OK {
@@ -276,7 +281,7 @@ struct BatchView: View {
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
         for provider in providers {
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url, !url.hasDirectoryPath, url.isImageFile else { return }
+                guard let url, !url.hasDirectoryPath, url.isProcessableFile else { return }
                 Task { @MainActor in
                     files.append(FileItem(url: url))
                 }
@@ -297,13 +302,20 @@ struct BatchView: View {
         let run = ActivityRun(summary: selection.summary)
         activity.insert(run, at: 0)
 
+        let tracked = RunProgress.shared.begin(total: urls.count)
+
         Task {
             let result = await ImageProcessor.process(urls, selection, policy: policy) { progress in
                 currentProgress = progress.completed
+                RunProgress.shared.update(tracked, completed: progress.completed)
                 // Looked up by id: the log may have been cleared mid-run.
                 if let index = activity.firstIndex(where: { $0.id == run.id }) {
                     activity[index].reports.insert(progress.latest, at: 0)
                 }
+            }
+            RunProgress.shared.end(tracked)
+            if let index = activity.firstIndex(where: { $0.id == run.id }) {
+                activity[index].savings = result.savingsText
             }
             try? await Task.sleep(for: .milliseconds(700))  // let the fill land
             handleCompletion(result, summary: summary)

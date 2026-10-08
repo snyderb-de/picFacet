@@ -7,13 +7,14 @@ import PicFacetCore
 // pickers (chips vs menus); the draft model, entry field, thumbnails and
 // completion alert live here.
 
-/// Format, resize and DPI menus with the typed resize value under them.
+/// Every processing option as a labelled menu, with typed values (resize,
+/// custom size limit, watermark, rename) under their menus.
 /// Used by both the Chooser and the Batch window.
 struct OperationMenus: View {
     @Binding var draft: OperationDraft
     var labelWidth: CGFloat = 60
     var menuWidth: CGFloat? = nil
-    /// Short hints under the Format and Resize labels.
+    /// Short hints under each label.
     var showsDetails = false
 
     var body: some View {
@@ -26,6 +27,21 @@ struct OperationMenus: View {
                         Text(format.displayName).tag(Optional(format))
                     }
                 }
+            }
+
+            row("Quality", detail: "JPEG, WebP, HEIC, AVIF") {
+                Picker("", selection: $draft.quality) {
+                    Text("Default").tag(nil as Int?)
+                    Divider()
+                    ForEach(QualityPreset.all, id: \.value) { preset in
+                        Text(preset.title).tag(Optional(preset.value))
+                    }
+                    if let quality = draft.quality, !QualityPreset.all.contains(where: { $0.value == quality }) {
+                        Text("Quality \(quality)").tag(Optional(quality))
+                    }
+                }
+                .disabled(draft.format.map { !$0.isLossy } ?? false)
+                .help(draft.format.map { $0.isLossy ? "" : "\($0.displayName) is lossless; quality doesn't apply." } ?? "")
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -41,13 +57,78 @@ struct OperationMenus: View {
                     .padding(.leading, labelWidth + 8)
             }
 
-            row("DPI") {
+            row("Crop", detail: "Centre to a ratio") {
+                Picker("", selection: $draft.crop) {
+                    Text("Original").tag(nil as CropRatio?)
+                    Divider()
+                    ForEach(CropRatio.presets, id: \.self) { ratio in
+                        Text(ratio.label).tag(Optional(ratio))
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                row("File size", detail: "Shrink to fit a limit") {
+                    Picker("", selection: $draft.targetSize) {
+                        ForEach(TargetSizeChoice.allCases, id: \.self) { choice in
+                            Text(choice.title).tag(choice)
+                            if choice == .none { Divider() }
+                        }
+                    }
+                }
+                if draft.targetSize == .custom {
+                    NumberEntry(text: $draft.targetKBText, placeholder: "Max size", suffix: "KB", isValid: draft.targetIsValid)
+                        .padding(.leading, labelWidth + 8)
+                }
+            }
+
+            row("DPI", detail: "Print resolution") {
                 Picker("", selection: $draft.dpi) {
                     Text("No Change").tag(nil as Int?)
                     Divider()
                     ForEach(PicFacetSettings.dpiOptions, id: \.self) { dpi in
                         Text("\(dpi) DPI").tag(Optional(dpi))
                     }
+                }
+            }
+
+            row("Metadata", detail: "Privacy before sharing") {
+                Picker("", selection: $draft.metadata) {
+                    Text("Keep All").tag(nil as MetadataMode?)
+                    Divider()
+                    ForEach(MetadataMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(Optional(mode))
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                row("Watermark", detail: "Text or logo") {
+                    Picker("", selection: $draft.watermarkKind) {
+                        ForEach(WatermarkKind.allCases, id: \.self) { kind in
+                            Text(kind.title).tag(kind)
+                            if kind == .none { Divider() }
+                        }
+                    }
+                }
+                if draft.watermarkKind != .none {
+                    WatermarkOptions(draft: $draft)
+                        .padding(.leading, labelWidth + 8)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                row("Rename", detail: "Output name pattern") {
+                    TextField("Keep name", text: $draft.renameTemplate)
+                        .pfEntryField(isValid: true)
+                        .help("Tokens: " + RenamePattern.tokens.joined(separator: " "))
+                }
+                if !draft.renameTemplate.isEmpty {
+                    Text(RenamePattern.tokens.joined(separator: "  "))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(PFDesign.onSurfaceVariant)
+                        .textSelection(.enabled)
+                        .padding(.leading, labelWidth + 8)
                 }
             }
         }
@@ -77,6 +158,110 @@ struct OperationMenus: View {
     }
 }
 
+/// Text or logo, position and size for the draft's watermark.
+private struct WatermarkOptions: View {
+    @Binding var draft: OperationDraft
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if draft.watermarkKind == .text {
+                TextField("© Your Name", text: $draft.watermark.text)
+                    .pfEntryField(isValid: draft.watermarkIsValid)
+            } else {
+                HStack(spacing: 8) {
+                    Button(draft.watermark.logoPath == nil ? "Choose Logo…" : "Change…", action: chooseLogo)
+                        .controlSize(.small)
+                    Text(draft.watermark.logoPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "PNG with transparency works best")
+                        .font(.system(size: 11))
+                        .foregroundStyle(draft.watermarkIsValid ? PFDesign.onSurfaceVariant : .red)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+            HStack(spacing: 8) {
+                Picker("Position", selection: $draft.watermark.position) {
+                    ForEach(Watermark.Position.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                }
+                Picker("Size", selection: $draft.watermark.size) {
+                    ForEach(Watermark.Size.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .fixedSize()
+        }
+    }
+
+    private func chooseLogo() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose a logo to stamp on each image"
+        if panel.runModal() == .OK, let url = panel.url {
+            draft.watermark.logoPath = url.path
+        }
+    }
+}
+
+extension View {
+    /// The inset text-field look used for typed values.
+    func pfEntryField(isValid: Bool, width: CGFloat? = nil) -> some View {
+        self
+            .textFieldStyle(.plain)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(PFDesign.onSurface)
+            .frame(width: width)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(PFDesign.surfaceLowest, in: RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
+                    .strokeBorder(isValid ? PFDesign.outlineVariant.opacity(0.2) : Color.red.opacity(0.55), lineWidth: 1)
+            }
+    }
+}
+
+/// Digits-only field bound to a draft value that filters its own input.
+/// TextField keeps its own editing text unless the bound value changes, so
+/// rejected characters are pushed back explicitly.
+struct NumberEntry: View {
+    @Binding var text: String
+    let placeholder: String
+    let suffix: String
+    var isValid = true
+
+    @State private var editing: String
+
+    init(text: Binding<String>, placeholder: String, suffix: String, isValid: Bool = true) {
+        _text = text
+        self.placeholder = placeholder
+        self.suffix = suffix
+        self.isValid = isValid
+        // Seeded here, not on appear: a focused field's editor would push its
+        // empty text back over a value set after the first render.
+        _editing = State(initialValue: text.wrappedValue)
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            TextField(placeholder, text: $editing)
+                .pfEntryField(isValid: isValid, width: 86)
+                .onChange(of: editing) { _, newValue in
+                    text = newValue
+                    if editing != text { editing = text }
+                }
+                .onChange(of: text) { _, newValue in
+                    if editing != newValue { editing = newValue }
+                }
+            Text(suffix)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(PFDesign.onSurfaceVariant)
+            Spacer()
+        }
+    }
+}
+
 /// Text field for the typed resize value of the draft's current mode.
 /// Shows nothing when the mode needs no value.
 struct ResizeEntryRow: View {
@@ -87,7 +272,15 @@ struct ResizeEntryRow: View {
     /// Mirrors the draft's value. The draft filters input, and TextField keeps its
     /// own editing text unless the bound value changes, so rejected characters are
     /// pushed back here explicitly.
-    @State private var text = ""
+    @State private var text: String
+
+    init(draft: Binding<OperationDraft>, showsLabel: Bool = true) {
+        _draft = draft
+        self.showsLabel = showsLabel
+        // Seeded here, not on appear: a focused field's editor would push its
+        // empty text back over a value set after the first render (e.g. a recipe).
+        _text = State(initialValue: draft.wrappedValue.entryText)
+    }
 
     var body: some View {
         if let entry = draft.resizeMode.entry {
@@ -99,23 +292,14 @@ struct ResizeEntryRow: View {
                 }
 
                 TextField(entry.label, text: $text)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(PFDesign.onSurface)
-                    .frame(width: 86)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(PFDesign.surfaceLowest, in: RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: PFDesign.rInner, style: .continuous)
-                            .strokeBorder(draft.entryIsValid ? PFDesign.outlineVariant.opacity(0.2) : Color.red.opacity(0.55), lineWidth: 1)
-                    }
+                    .pfEntryField(isValid: draft.entryIsValid, width: 86)
                     .onChange(of: text) { _, newValue in
                         draft.entryText = newValue
                         if text != draft.entryText { text = draft.entryText }
                     }
-                    .onChange(of: draft.resizeMode, initial: true) {
-                        text = draft.entryText
+                    // Mode switches and loaded recipes change the value from outside.
+                    .onChange(of: draft.entryText) { _, newValue in
+                        if text != newValue { text = newValue }
                     }
 
                 Text(entry.suffix)
@@ -154,6 +338,11 @@ enum CompletionAlert {
         alert.messageText = "Processing Complete"
 
         var lines = [summary, "Saved \(result.succeeded.count) file(s)."]
+        if let savings = result.savingsText { lines.append(savings) }
+        let notes = result.reports.filter { $0.note != nil }
+        if !notes.isEmpty {
+            lines.append("\(notes.count) file(s) couldn't reach the size limit; the smallest version was saved: \(names(notes.map(\.source))).")
+        }
         let kept = result.keptOriginal
         if !kept.isEmpty {
             lines.append("Kept \(kept.count) original(s) unchanged because the result wasn't smaller: \(names(kept)).")
@@ -185,6 +374,8 @@ struct ActivityRun: Identifiable {
     let started = Date()
     /// Newest first.
     var reports: [FileReport] = []
+    /// Total size change, set when the run finishes.
+    var savings: String?
 }
 
 /// Per-file results of past runs, newest run first.
@@ -219,6 +410,11 @@ struct ActivityLogView: View {
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(PFDesign.onSurfaceVariant)
                                     .lineLimit(2)
+                                if let savings = run.savings {
+                                    Label(savings, systemImage: "arrow.down.circle")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(PFDesign.success)
+                                }
                                 ForEach(Array(run.reports.enumerated()), id: \.offset) { ActivityRow(report: $0.element) }
                             }
                         }
@@ -257,7 +453,7 @@ private struct ActivityRow: View {
 
     private var icon: String {
         switch report.outcome {
-        case .written: "checkmark.circle.fill"
+        case .written: report.note == nil ? "checkmark.circle.fill" : "exclamationmark.circle.fill"
         case .keptOriginal: "arrow.uturn.backward.circle.fill"
         case .failed: "exclamationmark.triangle.fill"
         }
@@ -265,7 +461,7 @@ private struct ActivityRow: View {
 
     private var tint: Color {
         switch report.outcome {
-        case .written: PFDesign.success
+        case .written: report.note == nil ? PFDesign.success : PFDesign.amber
         case .keptOriginal: PFDesign.amber
         case .failed: .red
         }
@@ -274,8 +470,9 @@ private struct ActivityRow: View {
     private var detail: String {
         switch report.outcome {
         case .written(let url):
-            let name = url.path == report.source.path ? "Overwritten" : "Saved as \(url.lastPathComponent)"
-            return [name, sizeChange].compactMap { $0 }.joined(separator: " · ")
+            var name = url.path == report.source.path ? "Overwritten" : "Saved as \(url.lastPathComponent)"
+            if !report.extraOutputs.isEmpty { name += " + \(report.extraOutputs.count) more page(s)" }
+            return [name, sizeChange, report.note].compactMap { $0 }.joined(separator: " · ")
         case .keptOriginal:
             guard let sizeChange else { return "Kept original" }
             return "Kept original · \(sizeChange), not smaller"
@@ -291,5 +488,39 @@ private struct ActivityRow: View {
 
     private static func bytes(_ count: Int) -> String {
         ByteCountFormatter.string(fromByteCount: Int64(count), countStyle: .file)
+    }
+}
+
+// MARK: - Recipes
+
+/// Load a saved recipe into the draft, or save the draft as one.
+struct RecipeMenu: View {
+    @Binding var draft: OperationDraft
+    @State private var recipes = RecipeStore.all
+
+    var body: some View {
+        Menu {
+            if recipes.isEmpty {
+                Text("No saved recipes")
+            }
+            ForEach(recipes) { recipe in
+                Button(recipe.name) { draft = OperationDraft(selection: recipe.selection) }
+            }
+            Divider()
+            Button("Save Current as Recipe…") {
+                if let selection = draft.selection { RecipeStore.promptToSave(selection) }
+            }
+            .disabled(draft.selection == nil)
+            Button("Manage Recipes…") { SettingsWindowController.shared.show() }
+        } label: {
+            Label("Recipes", systemImage: "wand.and.stars")
+                .font(.system(size: 12, weight: .medium))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .tint(PFDesign.primary)
+        .onReceive(NotificationCenter.default.publisher(for: .picFacetRecipesChanged)) { _ in
+            recipes = RecipeStore.all
+        }
     }
 }

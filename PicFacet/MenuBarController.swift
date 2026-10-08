@@ -4,6 +4,11 @@ import PicFacetCore
 
 final class MenuBarController {
     private let statusItem: NSStatusItem
+    private var idleImage: NSImage?
+    /// Top menu row while batches run: "Processing 3 of 10 files…".
+    private let progressItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let progressSeparator = NSMenuItem.separator()
+    private var doneReset: DispatchWorkItem?
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -12,7 +17,65 @@ final class MenuBarController {
         
         configureButton()
         buildMenu()
+        RunProgress.shared.onChange = { [weak self] in self?.progressChanged() }
         NSLog("[MenuBar] Menu bar initialized")
+    }
+
+    // MARK: - Progress
+
+    /// While anything runs, the icon becomes a ring filling with progress;
+    /// when the last run ends it shows a checkmark briefly, then goes back.
+    private func progressChanged() {
+        let progress = RunProgress.shared
+        guard let button = statusItem.button else { return }
+        doneReset?.cancel()
+
+        progressItem.isHidden = !progress.isRunning
+        progressSeparator.isHidden = !progress.isRunning
+
+        if progress.isRunning {
+            button.image = Self.ringImage(fraction: progress.fraction)
+            button.toolTip = progress.label
+            progressItem.title = progress.label
+            return
+        }
+
+        button.image = NSImage(systemSymbolName: "checkmark.circle", accessibilityDescription: "Done")
+        button.image?.isTemplate = true
+        button.toolTip = "PicFacet"
+        let reset = DispatchWorkItem { [weak self] in
+            self?.statusItem.button?.image = self?.idleImage
+        }
+        doneReset = reset
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: reset)
+    }
+
+    /// 18 pt template ring: a faint full circle with the done share drawn
+    /// clockwise from 12 o'clock.
+    private static func ringImage(fraction: Double) -> NSImage {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+            let center = NSPoint(x: rect.midX, y: rect.midY)
+            let radius: CGFloat = 6.5
+
+            let track = NSBezierPath()
+            track.appendArc(withCenter: center, radius: radius, startAngle: 0, endAngle: 360)
+            track.lineWidth = 2.2
+            NSColor.black.withAlphaComponent(0.3).setStroke()
+            track.stroke()
+
+            let done = max(0.03, min(1, fraction))
+            let arc = NSBezierPath()
+            arc.appendArc(withCenter: center, radius: radius,
+                          startAngle: 90, endAngle: 90 - 360 * done, clockwise: true)
+            arc.lineWidth = 2.2
+            arc.lineCapStyle = .round
+            NSColor.black.setStroke()
+            arc.stroke()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "PicFacet progress"
+        return image
     }
 
     private func configureButton() {
@@ -27,12 +90,14 @@ final class MenuBarController {
         if let customIcon = createMenuBarIcon() {
             button.image = customIcon
             button.image?.isTemplate = true
+            idleImage = button.image
             NSLog("[MenuBar] Custom icon created")
         } else {
             // Fallback to SF Symbol
             button.image = NSImage(systemSymbolName: "photo.on.rectangle.angled",
                                    accessibilityDescription: "PicFacet")
             button.image?.isTemplate = true
+            idleImage = button.image
             NSLog("[MenuBar] Using fallback icon")
         }
     }
@@ -63,6 +128,16 @@ final class MenuBarController {
 
     private func buildMenu() {
         let menu = NSMenu()
+
+        // Reused across rebuilds; an item can only belong to one menu.
+        progressItem.menu?.removeItem(progressItem)
+        progressSeparator.menu?.removeItem(progressSeparator)
+        progressItem.isEnabled = false
+        progressItem.isHidden = !RunProgress.shared.isRunning
+        progressSeparator.isHidden = progressItem.isHidden
+        progressItem.title = RunProgress.shared.label
+        menu.addItem(progressItem)
+        menu.addItem(progressSeparator)
         
         // Batch Processor
         let batchItem = NSMenuItem(title: "Batch Processor…",

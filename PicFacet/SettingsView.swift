@@ -17,6 +17,13 @@ struct SettingsView: View {
     @State private var defaultFormat: ImageFormat? = PicFacetSettings.shared.defaultFormat
     @State private var defaultResizePercent: Int? = PicFacetSettings.shared.defaultResizePercent
     @State private var defaultDPI: Int? = PicFacetSettings.shared.defaultDPI
+    @State private var notifyAfterRuns: Bool = PicFacetSettings.shared.notifyAfterRuns
+    @State private var recipes: [Recipe] = RecipeStore.all
+    @State private var watchedFolders: [WatchedFolder] = PicFacetSettings.shared.watchedFolders
+    @State private var watchInBackground: Bool = PicFacetSettings.shared.watchInBackground
+    @State private var backgroundStatus = BackgroundWatching.status
+    @State private var backgroundError: String?
+    @State private var isConfirmingDelete = false
 
     var body: some View {
         Form {
@@ -205,7 +212,7 @@ struct SettingsView: View {
 
                 Toggle(isOn: $saveUnsupportedAsJPEG) {
                     Text("Save unsupported formats as JPEG")
-                    Text("RAW, AVIF, ICO and other formats PicFacet can read but not write. When resizing or changing DPI, save a JPEG beside the original instead of skipping the file. Choosing a Convert format always works.")
+                    Text("RAW, ICO, PSD and other formats PicFacet can read but not write. When resizing or changing DPI, save a JPEG beside the original instead of skipping the file. Choosing a Convert format always works.")
                 }
                 .onChange(of: saveUnsupportedAsJPEG) { _, new in PicFacetSettings.shared.saveUnsupportedAsJPEG = new }
             }
@@ -217,6 +224,130 @@ struct SettingsView: View {
                 }
                 .onChange(of: isProportional) { _, new in PicFacetSettings.shared.isProportional = new }
             }
+
+            Section {
+                if recipes.isEmpty {
+                    Text("Set up options in the Chooser or Batch window, then choose Recipes → Save Current as Recipe…")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(recipes) { recipe in
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            TextField("", text: recipeName(recipe.id), prompt: Text("Recipe name"))
+                                .labelsHidden()
+                                .multilineTextAlignment(.leading)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 13, weight: .medium))
+                            Text(recipe.selection.summary)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                        Spacer()
+                        Button(role: .destructive) { RecipeStore.delete(recipe.id) } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Delete recipe")
+                    }
+                }
+            } header: {
+                Text("Recipes")
+            } footer: {
+                Text("Recipes appear in the Chooser, the Batch window, Finder's PicFacet menu (with the Finder extension on) and the Shortcuts app.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                ForEach(watchedFolders) { folder in
+                    VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 10) {
+                        Toggle("Watch \(folder.url.lastPathComponent)", isOn: folderEnabled(folder.id))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .controlSize(.small)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(folder.url.lastPathComponent)
+                                .font(.system(size: 13, weight: .medium))
+                            Text(folder.path)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        Spacer()
+                        // Several recipes: each makes its own output from the original.
+                        Menu {
+                            ForEach(recipes) { recipe in
+                                Toggle(recipe.name, isOn: folderUsesRecipe(folder.id, recipe.id))
+                            }
+                        } label: {
+                            Text(recipeSummary(folder))
+                                .lineLimit(1)
+                        }
+                        .frame(width: 150)
+                        .help("Recipes to run on each new image. With more than one, each saves to its own folder inside “\(WatchedFolder.outputFolderName)”.")
+                        Button(role: .destructive) {
+                            PicFacetSettings.shared.setWatchSnapshot(nil, for: folder.id)
+                            updateFolders { $0.removeAll { $0.id == folder.id } }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Stop watching")
+                    }
+                    // String title, so VoiceOver and UI scripting see the name.
+                    Toggle("Delete originals after processing", isOn: folderDeletesOriginals(folder.id))
+                        .font(.system(size: 11))
+                        .foregroundStyle(folder.deleteOriginals ? Color.red : .secondary)
+                        .toggleStyle(.checkbox)
+                    .controlSize(.small)
+                    .padding(.leading, 46)
+                    }
+                }
+                Button("Add Folder…", action: addWatchedFolder)
+                    .disabled(recipes.isEmpty)
+
+                if !watchedFolders.isEmpty {
+                    Toggle(isOn: $watchInBackground) {
+                        Text("Keep watching when PicFacet is closed")
+                        Text(backgroundDetail)
+                    }
+                    .onChange(of: watchInBackground) { _, new in setBackground(new) }
+
+                    if watchInBackground && backgroundStatus == .requiresApproval {
+                        Button("Open Login Items…") { BackgroundWatching.openLoginItemsSettings() }
+                    }
+                }
+            } header: {
+                Text("Watched Folders")
+            } footer: {
+                Text(recipes.isEmpty
+                     ? "Save a recipe first. New images in a watched folder are run through its recipe."
+                     : "New images dropped in a watched folder are run through its recipe. Results go to a “\(WatchedFolder.outputFolderName)” subfolder (one folder per recipe when a folder runs several); originals are kept unless you choose to delete them, and then only after every recipe has saved its result. Images added while nothing was watching are processed the next time watching starts.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Notifications") {
+                Toggle(isOn: $notifyAfterRuns) {
+                    Text("Show a summary after background runs")
+                    Text("After a Quick Action, Finder recipe or watched folder, show how many files were saved and the space saved.")
+                }
+                .onChange(of: notifyAfterRuns) { _, new in PicFacetSettings.shared.notifyAfterRuns = new }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // The user may have approved the login item in System Settings.
+            backgroundStatus = BackgroundWatching.status
+            FolderWatchController.shared.reload()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .picFacetRecipesChanged)) { _ in
+            recipes = RecipeStore.all
+            watchedFolders = PicFacetSettings.shared.watchedFolders
+            FolderWatchController.shared.reload()
         }
         .formStyle(.grouped)
         .tint(PFDesign.primary)
@@ -224,6 +355,134 @@ struct SettingsView: View {
     }
 
     private var theme: Theme { Theme.shared }
+
+    // MARK: Recipes & watched folders
+
+    private func recipeName(_ id: UUID) -> Binding<String> {
+        Binding(
+            get: { recipes.first { $0.id == id }?.name ?? "" },
+            set: { name in
+                guard var recipe = recipes.first(where: { $0.id == id }) else { return }
+                recipe.name = name
+                RecipeStore.update(recipe)
+            }
+        )
+    }
+
+    private func updateFolders(_ change: (inout [WatchedFolder]) -> Void) {
+        change(&watchedFolders)
+        PicFacetSettings.shared.watchedFolders = watchedFolders
+        FolderWatchController.shared.reload()
+    }
+
+    private var backgroundDetail: String {
+        if let backgroundError { return backgroundError }
+        guard watchInBackground else {
+            return "Runs a small background helper that starts at login, so folders are watched even after you quit PicFacet."
+        }
+        switch backgroundStatus {
+        case .enabled: return "Watching in the background. The PicFacet Watcher helper starts at login."
+        case .requiresApproval: return "Allow “PicFacet Watcher” under System Settings → General → Login Items. Until then, folders are watched only while PicFacet is open."
+        default: return "The background helper isn't running. Folders are watched only while PicFacet is open."
+        }
+    }
+
+    private func setBackground(_ enabled: Bool) {
+        guard enabled != PicFacetSettings.shared.watchInBackground else { return }
+        do {
+            try BackgroundWatching.setEnabled(enabled)
+            backgroundError = nil
+        } catch {
+            backgroundError = "Couldn't start the background helper: \(error.localizedDescription)"
+            watchInBackground = false
+        }
+        backgroundStatus = BackgroundWatching.status
+    }
+
+    private func folderEnabled(_ id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { watchedFolders.first { $0.id == id }?.isEnabled ?? false },
+            set: { value in
+                // Switched back on: start fresh rather than process everything added meanwhile.
+                if value { FolderWatchController.shared.resetHistory(id) }
+                updateFolders { folders in
+                    if let i = folders.firstIndex(where: { $0.id == id }) { folders[i].isEnabled = value }
+                }
+            }
+        )
+    }
+
+    /// Turning deletion on asks first: originals are removed permanently.
+    private func folderDeletesOriginals(_ id: UUID) -> Binding<Bool> {
+        Binding(
+            get: { watchedFolders.first { $0.id == id }?.deleteOriginals ?? false },
+            set: { value in
+                guard value else { return setDeleteOriginals(false, for: id) }
+                // Ask outside the binding update, once: a modal run from inside
+                // SwiftUI's setter can be re-entered by further clicks.
+                guard !isConfirmingDelete else { return }
+                isConfirmingDelete = true
+                DispatchQueue.main.async {
+                    if confirmDeleteOriginals(for: id) { setDeleteOriginals(true, for: id) }
+                    isConfirmingDelete = false
+                }
+            }
+        )
+    }
+
+    private func setDeleteOriginals(_ value: Bool, for id: UUID) {
+        updateFolders { folders in
+            if let i = folders.firstIndex(where: { $0.id == id }) { folders[i].deleteOriginals = value }
+        }
+    }
+
+    private func confirmDeleteOriginals(for id: UUID) -> Bool {
+        let name = watchedFolders.first { $0.id == id }?.url.lastPathComponent ?? "this folder"
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = "Permanently delete originals in “\(name)”?"
+        alert.informativeText = "After each image is processed into “\(WatchedFolder.outputFolderName)”, the file you dropped in is deleted permanently. It does not go to the Trash and can't be recovered.\n\nA file is deleted only after every recipe for this folder has saved its result. If any recipe fails, or a result is discarded because it wasn't smaller, the original stays."
+        alert.addButton(withTitle: "Delete Originals")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons.first?.hasDestructiveAction = true
+        NSApp.activate()
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    /// "Blog" or "Blog + 2 more".
+    private func recipeSummary(_ folder: WatchedFolder) -> String {
+        let names = folder.recipeIDs.compactMap { id in recipes.first { $0.id == id }?.name }
+        guard let first = names.first else { return "Choose recipes" }
+        return names.count == 1 ? first : "\(first) + \(names.count - 1) more"
+    }
+
+    /// Adds or removes a recipe; the last one can't be removed.
+    private func folderUsesRecipe(_ folderID: UUID, _ recipeID: UUID) -> Binding<Bool> {
+        Binding(
+            get: { watchedFolders.first { $0.id == folderID }?.recipeIDs.contains(recipeID) ?? false },
+            set: { value in updateFolders { folders in
+                guard let i = folders.firstIndex(where: { $0.id == folderID }) else { return }
+                if value {
+                    if !folders[i].recipeIDs.contains(recipeID) { folders[i].recipeIDs.append(recipeID) }
+                } else if folders[i].recipeIDs.count > 1 {
+                    folders[i].recipeIDs.removeAll { $0 == recipeID }
+                }
+            } }
+        )
+    }
+
+    private func addWatchedFolder() {
+        guard let recipe = recipes.first else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Watch"
+        panel.message = "New images in this folder will be run through a recipe."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard !watchedFolders.contains(where: { $0.path == url.path }) else { return }
+        updateFolders { $0.append(WatchedFolder(path: url.path, recipeID: recipe.id)) }
+    }
 
     private func settingLabel(_ title: String, _ detail: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {

@@ -7,7 +7,7 @@
          Re-enable sandbox + user-selected files + bookmarks for App Store build. -->
     <key>com.apple.security.application-groups</key>
     <array>
-        <string>group.com.picfacet.shared</string>
+        <string>$(TeamIdentifierPrefix)com.picfacet.shared</string>
     </array>
 </dict>
 </plist>

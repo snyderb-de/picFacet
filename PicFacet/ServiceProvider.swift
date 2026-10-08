@@ -14,30 +14,13 @@ final class ServiceProvider: NSObject {
         guard let items = pboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] else {
             return []
         }
-        return items.filter { $0.isImageFile }
+        return items.filter { $0.isProcessableFile }
     }
 
     private func run(_ pboard: NSPasteboard, _ selection: BatchSelection) {
         let urls = imageURLs(from: pboard)
         NSLog("[PicFacet] Service fired — %d image(s)", urls.count)
-        guard !urls.isEmpty else { return }
-        let policy = PicFacetSettings.shared.outputPolicy
-        Task {
-            let result = await ImageProcessor.process(urls, selection, policy: policy) { p in
-                NSLog("[PicFacet] progress %d/%d", p.completed, p.total)
-            }
-            NSLog("[PicFacet] done — ok=%d kept=%d failed=%d",
-                  result.succeeded.count, result.keptOriginal.count, result.failed.count)
-            for f in result.failed {
-                NSLog("[PicFacet] fail %@: %@",
-                      f.url.lastPathComponent, f.error.localizedDescription)
-            }
-            // One-shot services stay silent on full success. Anything the user
-            // would otherwise not notice (kept originals, failures) gets an alert.
-            if !result.keptOriginal.isEmpty || result.hasErrors {
-                CompletionAlert.show(result, summary: selection.summary)
-            }
-        }
+        QuickRun.run(urls, selection, policy: PicFacetSettings.shared.outputPolicy, title: selection.summary)
     }
 
     // MARK: - Chooser

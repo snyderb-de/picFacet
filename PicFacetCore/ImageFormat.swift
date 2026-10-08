@@ -2,7 +2,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-public enum ImageFormat: String, CaseIterable, Sendable {
+public enum ImageFormat: String, CaseIterable, Codable, Sendable {
     case jpeg
     case png
     case webp
@@ -10,6 +10,8 @@ public enum ImageFormat: String, CaseIterable, Sendable {
     case gif
     case bmp
     case heic
+    case avif
+    case pdf
 
     public var displayName: String {
         switch self {
@@ -20,6 +22,17 @@ public enum ImageFormat: String, CaseIterable, Sendable {
         case .gif:  return "GIF"
         case .bmp:  return "BMP"
         case .heic: return "HEIC"
+        case .avif: return "AVIF"
+        case .pdf:  return "PDF"
+        }
+    }
+
+    /// Formats whose encoder takes a compression quality. Target file size
+    /// searches quality for these, and only downscales for the rest.
+    public var isLossy: Bool {
+        switch self {
+        case .jpeg, .webp, .heic, .avif: return true
+        default: return false
         }
     }
 
@@ -41,6 +54,8 @@ public enum ImageFormat: String, CaseIterable, Sendable {
         case .gif:  return "com.compuserve.gif"
         case .bmp:  return "com.microsoft.bmp"
         case .heic: return "public.heic"
+        case .avif: return "public.avif"
+        case .pdf:  return "com.adobe.pdf"
         }
     }
 
@@ -54,6 +69,8 @@ public enum ImageFormat: String, CaseIterable, Sendable {
         case "gif":         self = .gif
         case "bmp":         self = .bmp
         case "heic", "heif":self = .heic
+        case "avif":        self = .avif
+        case "pdf":         self = .pdf
         default:            return nil
         }
     }
@@ -62,15 +79,22 @@ public enum ImageFormat: String, CaseIterable, Sendable {
 // MARK: - URL helpers
 
 public extension URL {
-    /// True if ImageIO can read this file type: the seven formats PicFacet writes
-    /// plus anything else the system decodes (RAW, AVIF, JPEG 2000, ICO, PSD…).
+    /// True if ImageIO can read this file type: the formats PicFacet writes
+    /// plus anything else the system decodes (RAW, JPEG 2000, ICO, PSD…).
+    /// PDF is not an image here; see `isProcessableFile`.
     /// Decided from the extension only, so it is cheap to call on every drop.
     var isImageFile: Bool {
+        if isPDFFile { return false }
         if ImageFormat(fileExtension: pathExtension) != nil { return true }
         guard !pathExtension.isEmpty,
               let type = UTType(filenameExtension: pathExtension) else { return false }
         return ImageReadableTypes.all.contains { type.conforms(to: $0) }
     }
+
+    var isPDFFile: Bool { pathExtension.lowercased() == "pdf" }
+
+    /// Images plus PDFs, whose pages PicFacet renders to images.
+    var isProcessableFile: Bool { isImageFile || isPDFFile }
 }
 
 /// The types ImageIO can decode on this Mac, so unreadable "images" such as

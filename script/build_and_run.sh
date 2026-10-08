@@ -17,13 +17,32 @@ cd "$ROOT_DIR"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
+# Signing: background folder watching (the PicFacet Watcher login item) and the
+# shared App Group need a signed build. Signs with your Apple Development
+# certificate when one is installed; the team is read from it unless TEAM_ID is set.
+#   UNSIGNED=1              build without signing (background watching off)
+#   ALLOW_PROVISIONING=1    let Xcode create/refresh App IDs and profiles on your
+#                           developer account (needed after adding a target or capability)
+SIGN_ARGS=(CODE_SIGNING_ALLOWED=NO)
+if [[ "${UNSIGNED:-0}" != "1" ]]; then
+  TEAM_ID="${TEAM_ID:-$(security find-certificate -c "Apple Development" -p 2>/dev/null \
+    | openssl x509 -noout -subject 2>/dev/null | sed -n 's/.*OU *= *\([A-Z0-9]\{10\}\).*/\1/p')}"
+  if [[ -n "$TEAM_ID" ]]; then
+    SIGN_ARGS=(DEVELOPMENT_TEAM="$TEAM_ID")
+    [[ "${ALLOW_PROVISIONING:-0}" == "1" ]] && SIGN_ARGS+=(-allowProvisioningUpdates)
+    echo "Signing with Apple Development team $TEAM_ID"
+  else
+    echo "No Apple Development certificate found: building unsigned (background watching off)." >&2
+  fi
+fi
+
 xcodebuild \
   -project "$PROJECT_NAME" \
   -scheme "$SCHEME" \
   -configuration "$CONFIGURATION" \
   -derivedDataPath "$DERIVED_DATA" \
   build \
-  CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED:-NO}"
+  "${SIGN_ARGS[@]}"
 
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"

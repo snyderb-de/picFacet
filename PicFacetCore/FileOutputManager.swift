@@ -5,9 +5,11 @@ struct FileOutputManager {
     // MARK: - Output URL
 
     /// Output URL for a format-conversion operation (extension changes).
-    static func outputURL(for inputURL: URL, targetFormat: ImageFormat, policy: OutputPolicy) -> URL {
+    /// `baseName` replaces the source's name (rename, PDF page suffix).
+    static func outputURL(for inputURL: URL, targetFormat: ImageFormat, baseName: String? = nil,
+                          policy: OutputPolicy) -> URL {
         let dir = outputDirectory(for: inputURL, policy: policy)
-        let base = inputURL.deletingPathExtension().lastPathComponent
+        let base = baseName ?? inputURL.deletingPathExtension().lastPathComponent
         let candidate = dir
             .appendingPathComponent(base)
             .appendingPathExtension(targetFormat.fileExtension)
@@ -21,18 +23,24 @@ struct FileOutputManager {
     }
 
     /// Output URL for an in-place operation where format stays the same (resize, DPI).
-    static func outputURL(for inputURL: URL, policy: OutputPolicy) -> URL {
-        if policy.overwriteSource {
+    /// With a `baseName` (rename) the file gets that name instead, deduplicated
+    /// against existing files unless overwriting.
+    static func outputURL(for inputURL: URL, baseName: String? = nil, policy: OutputPolicy) -> URL {
+        if policy.overwriteSource && baseName == nil {
             return inputURL
         }
         let dir = outputDirectory(for: inputURL, policy: policy)
-        let base = inputURL.deletingPathExtension().lastPathComponent
+        let base = baseName ?? inputURL.deletingPathExtension().lastPathComponent
         let ext  = inputURL.pathExtension
         let candidate = dir.appendingPathComponent(base).appendingPathExtension(ext)
 
-        // Avoid a silent collision when the output folder is the same as the source folder
         if candidate.path == inputURL.path {
+            if policy.overwriteSource { return inputURL }
+            // Avoid a silent collision when the output folder is the same as the source folder
             return dir.appendingPathComponent("\(base)-picfacet").appendingPathExtension(ext)
+        }
+        if baseName != nil && !policy.overwriteSource && FileManager.default.fileExists(atPath: candidate.path) {
+            return deduplicated(candidate)
         }
         return candidate
     }

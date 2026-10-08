@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- Shared settings container. Team-prefixed: macOS authorises it for
+         every target from the same team without per-App-ID registration. -->
+    <key>PicFacetAppGroup</key>
+    <string>$(TeamIdentifierPrefix)com.picfacet.shared</string>
     <key>CFBundleDisplayName</key>
     <string>PicFacet</string>
     <key>CFBundleExecutable</key>
@@ -80,7 +84,7 @@
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet…</string></dict>
             <key>NSMessage</key><string>picFacetChooser</string>
             <key>NSPortName</key><string>PicFacet</string>
-            <key>NSSendFileTypes</key><array><string>public.image</string></array>
+            <key>NSSendFileTypes</key><array><string>public.image</string><string>com.adobe.pdf</string></array>
         </dict>
 
         <!-- Convert -->
@@ -137,6 +141,29 @@
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>
+        <dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Convert to AVIF</string></dict>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>convert:avif</string>
+            <key>NSPortName</key><string>PicFacet</string>
+            <key>NSSendFileTypes</key><array><string>public.image</string></array>
+        </dict>
+
+        <!-- PDF pages to images -->
+        <dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Convert PDF to PNG</string></dict>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>convert:png</string>
+            <key>NSPortName</key><string>PicFacet</string>
+            <key>NSSendFileTypes</key><array><string>com.adobe.pdf</string></array>
+        </dict>
+        <dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Convert PDF to JPEG</string></dict>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>convert:jpeg</string>
+            <key>NSPortName</key><string>PicFacet</string>
+            <key>NSSendFileTypes</key><array><string>com.adobe.pdf</string></array>
+        </dict>
 
         <!-- Resize -->
         <dict>
@@ -157,6 +184,50 @@
             <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Resize 75%</string></dict>
             <key>NSMessage</key><string>picFacetRun</string>
             <key>NSUserData</key><string>resize:75%</string>
+            <key>NSPortName</key><string>PicFacet</string>
+            <key>NSSendFileTypes</key><array><string>public.image</string></array>
+        </dict>
+        <dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Fit Within 1920 px</string></dict>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>longedge:1920</string>
+            <key>NSPortName</key><string>PicFacet</string>
+            <key>NSSendFileTypes</key><array><string>public.image</string></array>
+        </dict>
+        <dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Crop Square</string></dict>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>crop:1:1</string>
+            <key>NSPortName</key><string>PicFacet</string>
+            <key>NSSendFileTypes</key><array><string>public.image</string></array>
+        </dict>
+
+        <!-- Compress & privacy -->
+        <dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Optimize for Web</string></dict>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>longedge:2048;quality:75;metadata:location</string>
+            <key>NSPortName</key><string>PicFacet</string>
+            <key>NSSendFileTypes</key><array><string>public.image</string></array>
+        </dict>
+        <dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Shrink Under 1 MB</string></dict>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>target:1mb</string>
+            <key>NSPortName</key><string>PicFacet</string>
+            <key>NSSendFileTypes</key><array><string>public.image</string></array>
+        </dict>
+        <dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Remove Location Data</string></dict>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>metadata:location</string>
+            <key>NSPortName</key><string>PicFacet</string>
+            <key>NSSendFileTypes</key><array><string>public.image</string></array>
+        </dict>
+        <dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>PicFacet: Remove All Metadata</string></dict>
+            <key>NSMessage</key><string>picFacetRun</string>
+            <key>NSUserData</key><string>metadata:all</string>
             <key>NSPortName</key><string>PicFacet</string>
             <key>NSSendFileTypes</key><array><string>public.image</string></array>
         </dict>

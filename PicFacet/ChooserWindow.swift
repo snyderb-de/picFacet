@@ -8,8 +8,9 @@ final class ChooserWindowController {
 
     private var window: NSWindow?
 
-    func show(urls: [URL]) {
-        let root = ChooserView(urls: urls) { [weak self] in
+    /// `selection` pre-fills the options, e.g. from a recipe; nil uses the defaults.
+    func show(urls: [URL], selection: BatchSelection? = nil) {
+        let root = ChooserView(urls: urls, initialSelection: selection) { [weak self] in
             self?.close()
         }
         if window == nil {
@@ -47,7 +48,13 @@ struct ChooserView: View {
     /// Closes the window: on Cancel, or after a run and its alert.
     let onClose: () -> Void
 
-    @State private var draft = OperationDraft.defaults()
+    @State private var draft: OperationDraft
+
+    init(urls: [URL], initialSelection: BatchSelection? = nil, onClose: @escaping () -> Void) {
+        self.urls = urls
+        self.onClose = onClose
+        _draft = State(initialValue: initialSelection.map(OperationDraft.init(selection:)) ?? .defaults())
+    }
     @State private var summary = QueueSummary()
     @State private var runStats = RunStats()
     /// (completed, total) while a run is in progress.
@@ -94,6 +101,7 @@ struct ChooserView: View {
                     actionBar
                 }
                 .padding(22)
+                .frame(maxHeight: .infinity, alignment: .top)
                 .pfPanel()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -168,10 +176,18 @@ struct ChooserView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
                 PFSectionLabel(text: "Processing Options")
+                Spacer()
+                RecipeMenu(draft: $draft)
+                    .disabled(isRunning)
             }
 
-            OperationMenus(draft: $draft, labelWidth: 170, menuWidth: 220, showsDetails: true)
-                .disabled(isRunning)
+            ScrollView {
+                OperationMenus(draft: $draft, labelWidth: 170, menuWidth: 220, showsDetails: true)
+                    .disabled(isRunning)
+                    .padding(.trailing, 4)
+            }
+            .scrollIndicators(.automatic)
+            .frame(maxHeight: .infinity)
         }
     }
 
@@ -205,11 +221,15 @@ struct ChooserView: View {
         progress = (0, urls.count)
         runStats = RunStats(total: urls.count)
 
+        let tracked = RunProgress.shared.begin(total: urls.count)
+
         Task {
             let result = await ImageProcessor.process(urls, selection, policy: policy) { p in
                 progress = (p.completed, p.total)
                 runStats.add(p.latest)
+                RunProgress.shared.update(tracked, completed: p.completed)
             }
+            RunProgress.shared.end(tracked)
             NSLog("[PicFacet] done ok=%d kept=%d failed=%d",
                   result.succeeded.count, result.keptOriginal.count, result.failed.count)
             try? await Task.sleep(for: .milliseconds(700))  // let the fill land
