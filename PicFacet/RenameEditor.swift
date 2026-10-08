@@ -232,7 +232,7 @@ struct RenameEditor: View {
 
     // MARK: Drag hint
 
-    private static let space = "renameEditor"
+    nonisolated private static let space = "renameEditor"
 
     /// A copy of the first token chip with a hand, shown only while the hint plays.
     @ViewBuilder

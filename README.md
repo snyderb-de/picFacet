@@ -131,6 +131,14 @@ In Xcode: select the **PicFacet** target → **Signing & Capabilities** → set 
 
 It also signs with your **Apple Development** certificate when one is installed (team read from the certificate, or set `TEAM_ID`), so background folder watching works locally. `UNSIGNED=1` builds unsigned (background watching then off). `ALLOW_PROVISIONING=1` lets Xcode create or refresh App IDs and profiles on your developer account; it's only needed after adding a target or capability.
 
+### Make a DMG
+
+```bash
+./script/make_dmg.sh            # → build/PicFacet-<version>.dmg
+```
+
+Archives a Release build and packages it with an Applications shortcut. With a **Developer ID Application** certificate installed it exports for distribution; set `NOTARY_PROFILE` (from `xcrun notarytool store-credentials`) to notarize and staple. Without one, the DMG holds the development-signed app, which opens on your own Macs but is blocked on everyone else's.
+
 ### First launch
 
 The onboarding window appears automatically and walks you through enabling the Quick Actions you want. By design, **all PicFacet services ship turned off** so they don't clutter your right-click menu — you opt in to the ones you want via:
@@ -188,7 +196,7 @@ You should see `[PicFacet] Service fired — N image(s)` after each click.
 - [x] Phase 4 — Custom input panels (custom %, target width, target height in Chooser and Batch)
 - [x] Phase 5 — Menu bar progress indicator (ring icon + "Processing 3 of 10 files…" while any batch runs)
 - [x] Phase 6 — Full settings window
-- [ ] Phase 7 — App icon (in design), DMG, notarization
+- [ ] Phase 7 — App icon (in design), DMG (`script/make_dmg.sh` ready), notarization (needs a Developer ID certificate)
 - [x] Phase 7.5 — Value features: quality, target size, metadata stripping, long edge, crop, watermark, rename, AVIF/PDF/WebP, recipes, watched folders (multi-recipe, background helper, delete originals), Shortcuts, savings report
 - [ ] Phase 8 — Pricing: $2.99 launch price, recipes included
 - [ ] Phase 9 — Mac App Store submission

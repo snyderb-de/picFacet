@@ -1,5 +1,5 @@
 import Foundation
-import UserNotifications
+@preconcurrency import UserNotifications
 
 /// Watches each enabled folder in Settings and hands images that appear there
 /// to `run` with the folder's recipe. Used by the app, and by the PicFacet

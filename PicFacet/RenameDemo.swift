@@ -21,7 +21,7 @@ struct RenameDemo: View {
     ]
 
     private static let chips = ["{name}", "{date}", "{n}"]
-    private static let space = "renameDemo"
+    nonisolated private static let space = "renameDemo"
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
