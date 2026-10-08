@@ -44,42 +44,25 @@ struct ResizeEngine {
     // MARK: - Size calculators
 
     static func size(for image: CGImage, operation: ResizeOperation, proportional: Bool) -> CGSize {
+        size(width: image.width, height: image.height, operation: operation, proportional: proportional)
+    }
+
+    static func size(width: Int, height: Int, operation: ResizeOperation, proportional: Bool) -> CGSize {
+        let w = CGFloat(width), h = CGFloat(height)
         switch operation {
         case .percent(let percent):
-            return size(for: image, byPercent: Double(percent))
-        case .width(let width):
-            return size(for: image, maxWidth: width, proportional: proportional)
-        case .height(let height):
-            return size(for: image, maxHeight: height, proportional: proportional)
+            let scale = CGFloat(percent) / 100
+            return CGSize(width: w * scale, height: h * scale)
+        case .width(let target):
+            return CGSize(width: CGFloat(target), height: proportional ? h * CGFloat(target) / w : h)
+        case .height(let target):
+            return CGSize(width: proportional ? w * CGFloat(target) / h : w, height: CGFloat(target))
         case .longEdge(let edge):
-            let long = max(image.width, image.height)
-            guard long > edge else { return CGSize(width: image.width, height: image.height) }
-            return size(for: image, byPercent: Double(edge) / Double(long) * 100)
+            let long = max(width, height)
+            guard long > edge else { return CGSize(width: w, height: h) }
+            let scale = CGFloat(edge) / CGFloat(long)
+            return CGSize(width: w * scale, height: h * scale)
         }
-    }
-
-    static func size(for image: CGImage, byPercent percent: Double) -> CGSize {
-        let scale = CGFloat(percent / 100.0)
-        return CGSize(width: CGFloat(image.width) * scale,
-                      height: CGFloat(image.height) * scale)
-    }
-
-    static func size(for image: CGImage, maxWidth width: Int, proportional: Bool) -> CGSize {
-        guard proportional else {
-            return CGSize(width: width, height: image.height)
-        }
-        let scale = CGFloat(width) / CGFloat(image.width)
-        return CGSize(width: CGFloat(width),
-                      height: CGFloat(image.height) * scale)
-    }
-
-    static func size(for image: CGImage, maxHeight height: Int, proportional: Bool) -> CGSize {
-        guard proportional else {
-            return CGSize(width: image.width, height: height)
-        }
-        let scale = CGFloat(height) / CGFloat(image.height)
-        return CGSize(width: CGFloat(image.width) * scale,
-                      height: CGFloat(height))
     }
 }
 

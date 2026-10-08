@@ -24,8 +24,8 @@ final class BatchWindowController {
             win.title = "PicFacet Processing"
             win.isReleasedWhenClosed = false
             win.backgroundColor = .windowBackgroundColor
-            win.setContentSize(NSSize(width: 920, height: 760))
-            win.minSize = NSSize(width: 820, height: 680)
+            win.setContentSize(NSSize(width: 920, height: 880))
+            win.minSize = NSSize(width: 820, height: 840)
             win.center()
             window = win
         } else {
@@ -71,8 +71,8 @@ struct BatchView: View {
             minWidth: 820,
             idealWidth: 920,
             maxWidth: .infinity,
-            minHeight: 680,
-            idealHeight: 760,
+            minHeight: 840,
+            idealHeight: 880,
             maxHeight: .infinity
         )
         .background { PFDesign.backdrop }
@@ -235,12 +235,9 @@ struct BatchView: View {
                         .disabled(isProcessing)
                 }
 
-                ScrollView {
-                    OperationMenus(draft: $draft, labelWidth: 78)
-                        .disabled(isProcessing)
-                        .padding(.trailing, 4)
-                }
-                .frame(minHeight: 200, idealHeight: 420, maxHeight: 420)
+                // No inner scroll box: the window is tall enough for every option.
+                OperationMenus(draft: $draft, sampleURLs: files.map(\.url), labelWidth: 78)
+                    .disabled(isProcessing)
 
                 PFRunBar(
                     summary: draft.summary,

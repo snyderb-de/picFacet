@@ -59,6 +59,24 @@ public struct BatchSelection: Hashable, Codable, Sendable {
         format != nil || resize != nil || quality != nil || maxBytes != nil || crop != nil || watermark?.isValid == true
     }
 
+    /// Pixel size of the saved image for a source of this size, after crop
+    /// and resize (a target file size may shrink it further).
+    public func outputPixelSize(width: Int, height: Int, proportional: Bool) -> (width: Int, height: Int) {
+        guard width > 0, height > 0 else { return (width, height) }
+        var w = width, h = height
+        if let crop {
+            let rect = CropEngine.rect(width: w, height: h, ratio: crop)
+            w = Int(rect.width)
+            h = Int(rect.height)
+        }
+        if let resize {
+            let size = ResizeEngine.size(width: w, height: h, operation: resize, proportional: proportional)
+            w = Int(size.width)
+            h = Int(size.height)
+        }
+        return (w, h)
+    }
+
     /// Human-readable steps, e.g. "Convert to PNG + Resize to 50% + Set 300 DPI".
     public var summary: String {
         var parts: [String] = []

@@ -12,6 +12,8 @@ import PicFacetCore
 /// Used by both the Chooser and the Batch window.
 struct OperationMenus: View {
     @Binding var draft: OperationDraft
+    /// Files in the queue, for the rename preview.
+    var sampleURLs: [URL] = []
     var labelWidth: CGFloat = 60
     var menuWidth: CGFloat? = nil
     /// Short hints under each label.
@@ -117,21 +119,42 @@ struct OperationMenus: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                row("Rename", detail: "Output name pattern") {
-                    TextField("Keep name", text: $draft.renameTemplate)
-                        .pfEntryField(isValid: true)
-                        .help("Tokens: " + RenamePattern.tokens.joined(separator: " "))
-                }
-                if !draft.renameTemplate.isEmpty {
-                    Text(RenamePattern.tokens.joined(separator: "  "))
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(PFDesign.onSurfaceVariant)
-                        .textSelection(.enabled)
-                        .padding(.leading, labelWidth + 8)
+            row("Rename", detail: "Output name pattern") {
+                HStack(spacing: 6) {
+                    Button { isEditingRename = true } label: {
+                        HStack(spacing: 6) {
+                            Text(draft.renameTemplate.isEmpty ? "Keep Names" : draft.renameTemplate)
+                                .font(.system(size: 12, weight: .medium,
+                                              design: draft.renameTemplate.isEmpty ? .default : .monospaced))
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Image(systemName: "pencil")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                    }
+                    .help("Edit the rename pattern")
+                    if !draft.renameTemplate.isEmpty {
+                        Button { draft.renameTemplate = "" } label: { Image(systemName: "xmark.circle.fill") }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(PFDesign.onSurfaceVariant)
+                            .help("Keep original names")
+                    }
                 }
             }
         }
+        .sheet(isPresented: $isEditingRename) {
+            RenameEditor(template: $draft.renameTemplate, samples: sampleURLs, selection: renameContext)
+        }
+    }
+
+    @State private var isEditingRename = false
+
+    /// The draft's other options, for the rename preview's format and size.
+    private var renameContext: BatchSelection {
+        var context = OperationDraft(format: draft.format, resizeMode: draft.resizeMode, dpi: nil)
+        context.entryText = draft.entryText
+        context.crop = draft.crop
+        return context.selection ?? BatchSelection(format: draft.format, crop: draft.crop)
     }
 
     private func row<Menu: View>(_ title: String, detail: String? = nil, @ViewBuilder menu: () -> Menu) -> some View {

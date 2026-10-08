@@ -41,8 +41,10 @@ final class ChooserWindowController {
 struct ChooserView: View {
     /// Outer padding 30×2 + files panel 300 + gap 22 + options panel (~560).
     /// Anything narrower clips the files panel and overlaps the options.
-    static let minSize = NSSize(width: 960, height: 660)
-    static let idealSize = NSSize(width: 1000, height: 700)
+    /// Tall enough for every option without scrolling; the options still
+    /// scroll if the user makes the window smaller than its content.
+    static let minSize = NSSize(width: 960, height: 780)
+    static let idealSize = NSSize(width: 1000, height: 860)
 
     let urls: [URL]
     /// Closes the window: on Cancel, or after a run and its alert.
@@ -182,11 +184,12 @@ struct ChooserView: View {
             }
 
             ScrollView {
-                OperationMenus(draft: $draft, labelWidth: 170, menuWidth: 220, showsDetails: true)
+                OperationMenus(draft: $draft, sampleURLs: urls, labelWidth: 170, menuWidth: 220, showsDetails: true)
                     .disabled(isRunning)
                     .padding(.trailing, 4)
             }
             .scrollIndicators(.automatic)
+            .scrollBounceBehavior(.basedOnSize)
             .frame(maxHeight: .infinity)
         }
     }

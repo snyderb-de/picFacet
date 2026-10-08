@@ -184,6 +184,13 @@ import Testing
 }
 
 @Suite struct RenamePatternTests {
+    @Test func outputSizeFollowsCropThenResize() {
+        let s = BatchSelection(resize: .longEdge(1000), crop: CropRatio(1, 1))
+        #expect(s.outputPixelSize(width: 4000, height: 3000, proportional: true) == (1000, 1000))
+        #expect(BatchSelection(resize: .percent(50)).outputPixelSize(width: 400, height: 200, proportional: true) == (200, 100))
+        #expect(BatchSelection().outputPixelSize(width: 0, height: 0, proportional: true) == (0, 0))
+    }
+
     let context = RenamePattern.Context(name: "IMG_1", index: 4, count: 120, width: 800, height: 600,
                                         fileExtension: "jpg", date: Date(timeIntervalSince1970: 10 * 86_400 + 43_200))  // midday, any time zone
 
