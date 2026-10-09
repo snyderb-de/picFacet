@@ -21,6 +21,8 @@ If you skip this, there is no `.xcodeproj` to open. Re-run `xcodegen generate` a
 
 ## What it does
 
+> **Docs:** [User guide](docs/user-guide.md) · [Changelog](CHANGELOG.md) · [Menu bar troubleshooting](docs/menu-bar-troubleshooting.md)
+
 Right-click any image (or batch of images) in Finder and pick a PicFacet Quick Action:
 
 - **Convert to** JPEG · PNG · WebP · HEIC · AVIF · TIFF · GIF · BMP · PDF, and **PDF pages → images** (one file per page)
@@ -173,17 +175,21 @@ You should see `[PicFacet] Service fired — N image(s)` after each click.
 ```
 .
 ├── README.md              ← this file
+├── CHANGELOG.md           ← what changed in each release
 ├── refactor.md            ← history of the Finder-Sync → NSServices pivot
 ├── project.yml            ← xcodegen config (source of truth)
-├── .gitignore
-├── PicFacet/              ← main app sources, Info.plist, entitlements
+├── PicFacet/              ← main app sources, Info.plist, entitlements, bundled licences
 ├── PicFacetCore/          ← framework sources + Info.plist
+├── PicFacetWatcher/       ← background login item for watched folders
+├── PicFacetFinderSync/    ← Finder extension (PicFacet… and PicFacet Recipes menu items)
 ├── PicFacetCoreTests/     ← Swift Testing suite (runs spec/cases.json too)
 ├── spec/cases.json        ← platform-neutral behaviour cases
-└── docs/roadmap/          ← parked future features
+├── script/                ← build_and_run.sh, make_dmg.sh
+├── docs/                  ← user guide, troubleshooting, roadmap, archive/ (old notes)
+└── mockups/               ← early HTML design mockups
 ```
 
-`PicFacet.xcodeproj/` and `build/` are gitignored. **Always re-run `xcodegen generate` after adding or removing source files.**
+`PicFacet.xcodeproj/` and `build/` are gitignored. **Always re-run `xcodegen generate` after adding or removing source files.** Keep docs out of the target folders (`PicFacet/`, `PicFacetCore/`…): anything there is copied into the app bundle.
 
 ---
 
@@ -191,20 +197,33 @@ You should see `[PicFacet] Service fired — N image(s)` after each click.
 
 - [x] Phase 1 — Project scaffold (xcodegen)
 - [x] Phase 2 — Image engine (convert/resize/DPI, all formats incl. HEIC)
-- [x] Phase 3 — NSServices Quick Actions (14 ops + chooser)
-- [x] Phase 3.5 — full chooser window + onboarding
-- [x] Phase 4 — Custom input panels (custom %, target width, target height in Chooser and Batch)
-- [x] Phase 5 — Menu bar progress indicator (ring icon + "Processing 3 of 10 files…" while any batch runs)
+- [x] Phase 3 — NSServices Quick Actions + chooser
+- [x] Phase 3.5 — Full chooser window + onboarding
+- [x] Phase 4 — Custom input panels (custom %, target width, target height)
+- [x] Phase 5 — Menu bar progress indicator
 - [x] Phase 6 — Full settings window
-- [ ] Phase 7 — App icon (in design), DMG (`script/make_dmg.sh` ready), notarization (needs a Developer ID certificate)
-- [x] Phase 7.5 — Value features: quality, target size, metadata stripping, long edge, crop, watermark, rename, AVIF/PDF/WebP, recipes, watched folders (multi-recipe, background helper, delete originals), Shortcuts, savings report
-- [ ] Phase 8 — Pricing: $2.99 launch price, recipes included
-- [ ] Phase 9 — Mac App Store submission
+- [x] Phase 7.5 — Value features: quality, target size, metadata, long edge, crop, watermark, rename window, AVIF/PDF/WebP, recipes (managed in Settings), watched folders (multi-recipe, background helper, delete originals), Shortcuts, savings report
+- [ ] Phase 7 — Release packaging: app icon (in design), DMG (`script/make_dmg.sh` ready), Developer ID signing + notarization
+- [ ] Phase 8 — Pricing: **$2.99 launch**, recipes included — pick a storefront
+- [ ] Phase 9 — Mac App Store submission (needs sandboxing, see below)
 - [ ] Future — Windows release (parked; see [docs/roadmap/windows-port.md](docs/roadmap/windows-port.md))
 
-## Current Gaps
+## To-do
 
-- Verify Finder Quick Actions end-to-end after each generated build.
-- Replace the generated/menu-bar symbol with final app icon assets.
-- Decide Mac App Store vs direct sale: the App Store needs the app sandboxed, which means reworking folder access for watched folders, the background helper, custom output folders and deletes.
-- Prepare packaging, signing, notarization, and Mac App Store metadata.
+**Blocking release**
+- [ ] Final app icon and menu bar icon (in design)
+- [ ] Join the paid Apple Developer Program; create a **Developer ID Application** certificate
+- [ ] Store notarization credentials (`xcrun notarytool store-credentials picfacet`), then `NOTARY_PROFILE=picfacet ./script/make_dmg.sh`
+- [ ] Bump version to 1.3.0 in `PicFacet/Info.plist`, `PicFacetWatcher/Info.plist` (and the Finder extension) before the release build
+- [ ] Decide where to sell: Mac App Store vs direct (Paddle, Gumroad, own site with the notarized DMG)
+
+**If going to the Mac App Store**
+- [ ] Sandbox the app. Needs security-scoped bookmarks for watched folders, the custom output folder, the background helper and file deletion
+- [ ] App Store screenshots, description and keywords; privacy details (no data collected)
+
+**Polish and checks**
+- [ ] Verify Finder Quick Actions end-to-end after each generated build
+- [ ] VoiceOver: the "Delete originals after processing" checkbox has no spoken name inside the Settings form
+- [ ] Settings' Delete-originals alert opens off-centre (app-modal alert, not a sheet)
+- [ ] WebP output drops EXIF/GPS/DPI (no libwebp mux yet); document or add metadata via WebPMux
+- [ ] Compare competitor prices before launch

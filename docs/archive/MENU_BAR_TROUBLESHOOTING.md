@@ -1,3 +1,5 @@
+> **Archived, out of date.** Written during early development (before 1.3) and kept for history only. Current docs: [README](../../README.md), [User guide](../user-guide.md), [Changelog](../../CHANGELOG.md).
+
 # Menu Bar Icon Troubleshooting
 
 ## ❌ Problem: Menu bar icon not showing
